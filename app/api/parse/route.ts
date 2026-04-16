@@ -1,9 +1,15 @@
 import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "AIキーが設定されていません" }, { status: 500 });
+  }
+  const groq = new Groq({ apiKey });
+
   const { text } = await req.json();
 
   if (!text?.trim()) {
