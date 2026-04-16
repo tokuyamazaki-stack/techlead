@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import type { Company, ResultType, CallRecord, TagConfig } from "../lib/types";
-import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS } from "../lib/types";
+import { useState, useRef } from "react";
+import type { Company, ResultType, CallRecord, TagConfig, UserSettings } from "../lib/types";
+import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS, NG_REASONS } from "../lib/types";
 import { today } from "../lib/parser";
+import MailModal from "./MailModal";
 
 interface Props {
   company: Company;
   tagConfig: TagConfig;
+  userSettings: UserSettings;
   onSave: (updated: Company) => void;
   onUpdateTags: (updated: TagConfig) => void;
   onClose: () => void;
+  currentIndex?: number;
+  totalCount?: number;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
 // タグ選択 + 追加・削除できるコンポーネント
@@ -43,7 +51,7 @@ function TagSelector({
 
   return (
     <div className="mb-4">
-      <label className="text-xs text-white/40 mb-2 block">{label}</label>
+      <label className="text-xs text-slate-500 mb-2 block">{label}</label>
       <div className="flex flex-wrap gap-1.5">
         {allTags.map((tag) => {
           const isSelected = selected.includes(tag);
@@ -54,7 +62,7 @@ function TagSelector({
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   isSelected
                     ? "bg-violet-600 text-white ring-1 ring-violet-400"
-                    : "bg-white/5 text-white/50 hover:bg-white/10"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                 }`}
               >
                 {tag}
@@ -80,15 +88,15 @@ function TagSelector({
               onChange={(e) => setNewTag(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") submitAdd(); if (e.key === "Escape") setAdding(false); }}
               placeholder="タグ名を入力..."
-              className="bg-white/10 border border-violet-500 rounded-full px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none w-28"
+              className="bg-slate-50 border border-violet-500 rounded-full px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-300 focus:outline-none w-28"
             />
-            <button onClick={submitAdd} className="text-xs text-violet-400 hover:text-violet-300 px-1">追加</button>
-            <button onClick={() => setAdding(false)} className="text-xs text-white/30 hover:text-white/50 px-1">✕</button>
+            <button onClick={submitAdd} className="text-xs text-violet-600 hover:text-violet-500 px-1">追加</button>
+            <button onClick={() => setAdding(false)} className="text-xs text-slate-400 hover:text-slate-600 px-1">✕</button>
           </div>
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="px-3 py-1.5 rounded-full text-xs text-white/30 border border-white/10 hover:border-white/30 hover:text-white/60 transition-all"
+            className="px-3 py-1.5 rounded-full text-xs text-slate-400 border border-slate-200 hover:border-slate-300 hover:text-slate-600 transition-all"
           >
             ＋ 追加
           </button>
@@ -98,10 +106,11 @@ function TagSelector({
   );
 }
 
-export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, onClose }: Props) {
+export default function ResultModal({ company, tagConfig, userSettings, onSave, onUpdateTags, onClose, currentIndex, totalCount, hasPrev, hasNext, onPrev, onNext }: Props) {
   const [selectedResult, setSelectedResult] = useState<ResultType | null>(company.latestResult ?? null);
   const [memo, setMemo] = useState("");
-  const [assignee, setAssignee] = useState(company.assignee || "");
+  const [assignee, setAssignee] = useState(company.assignee || userSettings.name || "");
+  const [showCalendar, setShowCalendar] = useState(false);
   const [nextDate, setNextDate] = useState(company.nextDate || "");
 
   // 担当者情報
@@ -114,10 +123,30 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
   const [selectedChallenges, setSelectedChallenges] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
+  // NG理由
+  const [ngReason, setNgReason] = useState("");
+
   const [saved, setSaved] = useState(false);
+  const [savedResult, setSavedResult] = useState<ResultType | null>(null);
+  const [showMailModal, setShowMailModal] = useState(false);
   const [tab, setTab] = useState<"call" | "info">("call");
 
+  // スワイプ検知
+  const touchStartX = useRef<number | null>(null);
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (diff > 60 && hasNext && onNext) onNext();
+    if (diff < -60 && hasPrev && onPrev) onPrev();
+    touchStartX.current = null;
+  }
+
   const showDetailTags = selectedResult && DETAIL_RESULTS.includes(selectedResult);
+  const isNgResult = selectedResult === "担当NG" || selectedResult === "受付NG";
+  const ngPresets = isNgResult ? NG_REASONS[selectedResult] : [];
 
   function toggleTag(list: string[], setList: (v: string[]) => void, tag: string) {
     setList(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
@@ -147,6 +176,7 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
       products: selectedProducts,
       challenges: selectedChallenges,
       interests: selectedInterests,
+      ...(ngReason.trim() && { ngReason: ngReason.trim() }),
     };
 
     const updated: Company = {
@@ -161,8 +191,12 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
     };
 
     onSave(updated);
+    setSavedResult(selectedResult);
     setSaved(true);
-    setTimeout(() => onClose(), 700);
+    // アポ獲得・資料送付はメール送信ボタンを表示するため自動クローズしない
+    if (selectedResult !== "アポ獲得" && selectedResult !== "資料送付") {
+      setTimeout(() => onClose(), 700);
+    }
   }
 
   function saveInfoOnly() {
@@ -179,26 +213,29 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
   }
 
   return (
+    <>
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4"
       onClick={onClose}
     >
       <div
-        className="bg-[#16161a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* 企業情報ヘッダー */}
-        <div className="px-6 pt-5 pb-4 border-b border-white/5 shrink-0">
+        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-start justify-between">
-            <div>
-              <div className="text-xs text-white/30 mb-0.5">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-slate-400 mb-0.5">
                 {company.industry}{company.employees && ` · ${company.employees}人`}
               </div>
-              <h2 className="text-xl font-semibold leading-tight">{company.company}</h2>
+              <h2 className="text-xl font-semibold text-slate-900 leading-tight">{company.company}</h2>
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 {company.phone && (
                   <a href={`tel:${company.phone}`} onClick={(e) => e.stopPropagation()}
-                    className="text-white/50 text-sm font-mono hover:text-violet-400 transition-colors">
+                    className="text-slate-500 text-sm font-mono hover:text-violet-600 transition-colors">
                     📞 {company.phone}
                   </a>
                 )}
@@ -209,15 +246,41 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
                 )}
               </div>
             </div>
-            <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl leading-none mt-1 shrink-0">✕</button>
+            <div className="flex items-center gap-1 ml-3 shrink-0">
+              {/* 前後ナビゲーション */}
+              {totalCount !== undefined && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={onPrev}
+                    disabled={!hasPrev}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all text-slate-600 text-sm"
+                    title="前の会社"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-xs text-slate-400 w-12 text-center tabular-nums">
+                    {(currentIndex ?? 0) + 1} / {totalCount}
+                  </span>
+                  <button
+                    onClick={onNext}
+                    disabled={!hasNext}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all text-slate-600 text-sm"
+                    title="次の会社"
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none ml-1">✕</button>
+            </div>
           </div>
 
           {/* タブ切り替え */}
-          <div className="flex gap-1 mt-3 bg-white/5 rounded-lg p-1 w-fit">
+          <div className="flex gap-1 mt-3 bg-slate-100 rounded-lg p-1 w-fit">
             {[{ id: "call", label: "コール記録" }, { id: "info", label: "担当者情報" }].map((t) => (
               <button key={t.id} onClick={() => setTab(t.id as "call" | "info")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  tab === t.id ? "bg-white text-black" : "text-white/40 hover:text-white/70"
+                  tab === t.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                 }`}>
                 {t.label}
               </button>
@@ -228,22 +291,33 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
         {/* スクロール可能な本文 */}
         <div className="overflow-y-auto flex-1 px-6 py-5">
           {saved ? (
-            <div className="text-center py-10">
+            <div className="text-center py-8">
               <div className="text-5xl mb-3">✓</div>
-              <div className="text-white/60">記録しました</div>
+              <div className="text-slate-600 mb-5">記録しました</div>
+              {(savedResult === "アポ獲得" || savedResult === "資料送付") && (
+                <button
+                  onClick={() => setShowMailModal(true)}
+                  className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl py-3 text-sm font-semibold transition-all mb-3"
+                >
+                  ✉ メールを送る
+                </button>
+              )}
+              <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                閉じる
+              </button>
             </div>
           ) : tab === "call" ? (
             <>
               {/* 結果ボタン */}
               <div className="mb-5">
-                <label className="text-xs text-white/40 mb-2.5 block">今日の結果を選択</label>
+                <label className="text-xs text-slate-500 mb-2.5 block">今日の結果を選択</label>
                 <div className="grid grid-cols-3 gap-2">
                   {RESULTS.map((r) => (
                     <button key={r} onClick={() => setSelectedResult(r)}
                       className={`py-3 rounded-xl text-sm font-semibold transition-all ${
                         selectedResult === r
                           ? RESULT_CONFIG[r].bg + " text-white ring-2 ring-white/20 scale-[1.03]"
-                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                       }`}>
                       {r}
                     </button>
@@ -251,10 +325,65 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
                 </div>
               </div>
 
+              {/* NG理由（担当NG・受付NGのみ） */}
+              {isNgResult && (
+                <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4">
+                  <label className="text-xs text-red-600 mb-2.5 block font-medium">NG理由（任意）</label>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {ngPresets.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setNgReason(ngReason === r ? "" : r)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          ngReason === r
+                            ? "bg-red-600 text-white ring-1 ring-red-400"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={ngReason}
+                    onChange={(e) => setNgReason(e.target.value)}
+                    placeholder="その他の理由を入力..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-red-400 transition-colors"
+                  />
+                </div>
+              )}
+
+              {/* アポ獲得時：カレンダー表示 */}
+              {selectedResult === "アポ獲得" && userSettings.calendarUrl && (
+                <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <span className="text-xs font-semibold text-emerald-700">空き日程を確認</span>
+                      <span className="text-xs text-slate-400 ml-2">相手に提案できる日時を選んでください</span>
+                    </div>
+                    <button
+                      onClick={() => setShowCalendar(!showCalendar)}
+                      className="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      {showCalendar ? "閉じる" : "カレンダーを開く"}
+                    </button>
+                  </div>
+                  {showCalendar && (
+                    <iframe
+                      src={userSettings.calendarUrl}
+                      className="w-full border-t border-emerald-100"
+                      style={{ height: "480px" }}
+                      frameBorder="0"
+                    />
+                  )}
+                </div>
+              )}
+
               {/* 詳細タグ（アポ・資料送付・再コールのみ表示） */}
               {showDetailTags && (
-                <div className="bg-white/[0.02] rounded-xl p-4 mb-4 border border-white/5 space-y-1">
-                  <p className="text-xs text-violet-400 mb-3 font-medium">詳細を記録（任意）</p>
+                <div className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100 space-y-1">
+                  <p className="text-xs text-violet-600 mb-3 font-medium">詳細を記録（任意）</p>
                   <TagSelector
                     label="提案した商材"
                     allTags={tagConfig.products}
@@ -285,57 +414,67 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
               {/* 次回連絡日 + 担当 */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">次回連絡日</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">次回連絡日</label>
                   <input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">コール担当</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">コール担当</label>
                   <input type="text" value={assignee} onChange={(e) => setAssignee(e.target.value)}
                     placeholder="例：山崎"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
               </div>
 
               {/* メモ */}
               <div className="mb-5">
-                <label className="text-xs text-white/40 mb-1.5 block">フリーメモ（任意）</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">フリーメモ（任意）</label>
                 <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2}
                   placeholder="その他、気になった点や次回のポイントなど..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
               </div>
 
               <button onClick={logResult} disabled={!selectedResult}
                 className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl py-3 text-sm font-semibold transition-all">
                 {selectedResult ? `「${selectedResult}」を記録する` : "↑ 結果を選択してください"}
               </button>
+
+              {/* 既存のアポ・資料送付に対してもメール送信ボタンを表示 */}
+              {(company.latestResult === "アポ獲得" || company.latestResult === "資料送付") && (
+                <button
+                  onClick={() => { setSavedResult(company.latestResult); setShowMailModal(true); }}
+                  className="w-full mt-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl py-3 text-sm font-semibold transition-all"
+                >
+                  ✉ メールを送る（{company.latestResult}）
+                </button>
+              )}
             </>
           ) : (
             /* 担当者情報タブ */
             <>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">担当者名</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">担当者名</label>
                   <input type="text" value={contactName} onChange={(e) => setContactName(e.target.value)}
                     placeholder="例：田中 太郎"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">直通電話番号</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">直通電話番号</label>
                   <input type="tel" value={directPhone} onChange={(e) => setDirectPhone(e.target.value)}
                     placeholder="例：03-1234-5678"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">メールアドレス</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">メールアドレス</label>
                   <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}
                     placeholder="例：tanaka@example.com"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">次回連絡日</label>
+                  <label className="text-xs text-slate-500 mb-1.5 block">次回連絡日</label>
                   <input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors" />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-violet-500 transition-colors" />
                 </div>
               </div>
               <button onClick={saveInfoOnly}
@@ -348,28 +487,29 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
 
         {/* コール履歴 */}
         {company.callHistory.length > 0 && (
-          <div className="border-t border-white/5 px-6 py-4 shrink-0 max-h-44 overflow-y-auto">
-            <div className="text-xs text-white/30 mb-2">コール履歴</div>
+          <div className="border-t border-slate-100 px-6 py-4 shrink-0 max-h-44 overflow-y-auto">
+            <div className="text-xs text-slate-400 mb-2">コール履歴</div>
             <div className="space-y-2">
               {company.callHistory.map((h) => (
                 <div key={h.id} className="text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-white/30 font-mono shrink-0">{h.date}</span>
+                    <span className="text-slate-400 font-mono shrink-0">{h.date}</span>
                     <span className={`px-2 py-0.5 rounded-full shrink-0 ${RESULT_CONFIG[h.result].badge}`}>{h.result}</span>
-                    {h.assignee && <span className="text-white/30 shrink-0">{h.assignee}</span>}
-                    {h.memo && <span className="text-white/40 truncate">{h.memo}</span>}
+                    {h.assignee && <span className="text-slate-400 shrink-0">{h.assignee}</span>}
+                    {h.ngReason && <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[10px] shrink-0">{h.ngReason}</span>}
+                    {h.memo && <span className="text-slate-500 truncate">{h.memo}</span>}
                   </div>
                   {/* タグ表示 */}
                   {(h.products?.length > 0 || h.challenges?.length > 0 || h.interests?.length > 0) && (
                     <div className="flex gap-1 flex-wrap mt-1 ml-24">
                       {h.products?.map((t) => (
-                        <span key={t} className="px-1.5 py-0.5 bg-violet-900/50 text-violet-300 rounded text-[10px]">{t}</span>
+                        <span key={t} className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px]">{t}</span>
                       ))}
                       {h.challenges?.map((t) => (
-                        <span key={t} className="px-1.5 py-0.5 bg-amber-900/50 text-amber-300 rounded text-[10px]">{t}</span>
+                        <span key={t} className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px]">{t}</span>
                       ))}
                       {h.interests?.map((t) => (
-                        <span key={t} className="px-1.5 py-0.5 bg-emerald-900/50 text-emerald-300 rounded text-[10px]">{t}</span>
+                        <span key={t} className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px]">{t}</span>
                       ))}
                     </div>
                   )}
@@ -380,5 +520,16 @@ export default function ResultModal({ company, tagConfig, onSave, onUpdateTags, 
         )}
       </div>
     </div>
+
+    {/* メールテンプレートモーダル */}
+    {showMailModal && (savedResult === "アポ獲得" || savedResult === "資料送付") && (
+      <MailModal
+        company={company}
+        userSettings={userSettings}
+        templateType={savedResult}
+        onClose={() => setShowMailModal(false)}
+      />
+    )}
+    </>
   );
 }

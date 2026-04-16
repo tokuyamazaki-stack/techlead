@@ -1,15 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import type { Company } from "../lib/types";
+import type { Company, CallList } from "../lib/types";
 
 interface Props {
-  onImport: (name: string, companies: Company[]) => void;
+  onImport: (meta: Omit<CallList, "id" | "companies" | "createdAt">, companies: Company[]) => void;
   onClose: () => void;
+  appendMode?: boolean;
+  appendListName?: string;
+  onAppend?: (companies: Company[]) => void;
 }
 
-export default function ImportModal({ onImport, onClose }: Props) {
+export default function ImportModal({ onImport, onClose, appendMode, appendListName, onAppend }: Props) {
   const [listName, setListName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [fiscalMonthFrom, setFiscalMonthFrom] = useState("");
+  const [fiscalMonthTo, setFiscalMonthTo] = useState("");
+  const [revenueFrom, setRevenueFrom] = useState("");
+  const [revenueTo, setRevenueTo] = useState("");
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<Company[]>([]);
   const [error, setError] = useState("");
@@ -43,7 +51,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
         industry: c.industry || "",
         subIndustry: c.subIndustry || "",
         employees: c.employees || "",
-        revenue: "",
+        revenue: c.revenue || "",
         contactName: "",
         directPhone: "",
         contactEmail: "",
@@ -69,43 +77,116 @@ export default function ImportModal({ onImport, onClose }: Props) {
 
   function doImport() {
     if (preview.length === 0) return;
-    const name = listName.trim() || `リスト ${new Date().toLocaleDateString("ja-JP")}`;
-    onImport(name, preview);
+    if (appendMode && onAppend) {
+      onAppend(preview);
+    } else {
+      const name = listName.trim() || `リスト ${new Date().toLocaleDateString("ja-JP")}`;
+      onImport({ name, industry, fiscalMonthFrom, fiscalMonthTo, revenueFrom, revenueTo }, preview);
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4"
       onClick={onClose}>
-      <div className="bg-[#16161a] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}>
 
         {/* ヘッダー */}
         <div className="flex items-start justify-between px-7 pt-7 pb-4 shrink-0">
           <div>
-            <h2 className="text-lg font-semibold">コールリストを取込</h2>
-            <p className="text-xs text-white/40 mt-1">SansanのリストをコピーしてAIが自動で解析します</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {appendMode ? `「${appendListName}」に企業を追加` : "コールリストを取込"}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">SansanのリストをコピーしてAIが自動で解析します</p>
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl leading-none">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
 
         {/* スクロール可能エリア */}
         <div className="overflow-y-auto flex-1 px-7">
 
-          {/* リスト名 */}
-          <div className="mb-4">
-            <label className="text-xs text-white/40 mb-1.5 block">リスト名（例：製造業・大手、IT・中小企業）</label>
-            <input
-              type="text"
-              value={listName}
-              onChange={(e) => setListName(e.target.value)}
-              placeholder="例：製造業 300億以上"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
+          {/* リスト名・メタデータ（新規作成時のみ） */}
+          {!appendMode && (
+            <>
+              <div className="mb-4">
+                <label className="text-xs text-slate-500 mb-1.5 block">リスト名（任意）</label>
+                <input
+                  type="text"
+                  value={listName}
+                  onChange={(e) => setListName(e.target.value)}
+                  placeholder="例：不動産仲介 大手"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-4 space-y-3">
+                <p className="text-xs text-slate-600 font-medium">Sansanの絞り込み条件（任意）</p>
+
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">業界</label>
+                  <input
+                    type="text"
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    placeholder="例：不動産仲介"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">決算月</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="number" min={1} max={12}
+                        value={fiscalMonthFrom}
+                        onChange={(e) => setFiscalMonthFrom(e.target.value)}
+                        placeholder="3"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">月</span>
+                    </div>
+                    <span className="text-slate-400 text-xs shrink-0">〜</span>
+                    <div className="flex-1 relative">
+                      <input
+                        type="number" min={1} max={12}
+                        value={fiscalMonthTo}
+                        onChange={(e) => setFiscalMonthTo(e.target.value)}
+                        placeholder="9"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">月</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">売上規模</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={revenueFrom}
+                      onChange={(e) => setRevenueFrom(e.target.value)}
+                      placeholder="10億"
+                      className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                    />
+                    <span className="text-slate-400 text-xs shrink-0">〜</span>
+                    <input
+                      type="text"
+                      value={revenueTo}
+                      onChange={(e) => setRevenueTo(e.target.value)}
+                      placeholder="100億"
+                      className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* 取込手順 */}
-          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 mb-4 text-xs text-white/50 space-y-1">
-            <p className="text-white/70 font-medium mb-2">取込手順</p>
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-4 text-xs text-slate-500 space-y-1">
+            <p className="text-slate-700 font-medium mb-2">取込手順</p>
             <p>① Sansanの企業リスト画面を開く</p>
             <p>② ページ上で Ctrl+A（全選択）→ Ctrl+C（コピー）</p>
             <p>③ 下のテキストエリアに貼り付け（Ctrl+V）</p>
@@ -114,14 +195,14 @@ export default function ImportModal({ onImport, onClose }: Props) {
 
           {/* テキストエリア */}
           <textarea
-            className="w-full h-40 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors resize-none font-mono mb-3"
+            className="w-full h-40 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors resize-none font-mono mb-3"
             placeholder="ここにSansanのデータを貼り付けてください..."
             value={text}
             onChange={(e) => { setText(e.target.value); setPreview([]); setError(""); }}
           />
 
           {error && (
-            <div className="mb-3 px-4 py-2.5 bg-red-900/30 border border-red-700/30 rounded-xl text-xs text-red-400">
+            <div className="mb-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
               {error}
             </div>
           )}
@@ -129,13 +210,13 @@ export default function ImportModal({ onImport, onClose }: Props) {
           {preview.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm text-white/50">解析結果：</span>
-                <span className="text-sm font-bold text-emerald-400">{preview.length}件</span>
+                <span className="text-sm text-slate-500">解析結果：</span>
+                <span className="text-sm font-bold text-emerald-600">{preview.length}件</span>
               </div>
-              <div className="rounded-xl border border-white/10 overflow-hidden max-h-52 overflow-y-auto">
+              <div className="rounded-xl border border-slate-200 overflow-hidden max-h-52 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-[#1a1a1f]">
-                    <tr className="text-white/40">
+                  <thead className="sticky top-0 bg-slate-50">
+                    <tr className="text-slate-500">
                       <th className="text-left px-4 py-2">会社名</th>
                       <th className="text-left px-4 py-2">電話番号</th>
                       <th className="text-left px-4 py-2">業種</th>
@@ -144,11 +225,11 @@ export default function ImportModal({ onImport, onClose }: Props) {
                   </thead>
                   <tbody>
                     {preview.map((c, i) => (
-                      <tr key={i} className="border-t border-white/5">
-                        <td className="px-4 py-2 text-white/80 font-medium">{c.company}</td>
-                        <td className="px-4 py-2 text-white/50 font-mono text-[11px]">{c.phone || "—"}</td>
-                        <td className="px-4 py-2 text-white/50">{c.industry || "—"}</td>
-                        <td className="px-4 py-2 text-white/40">{c.employees || "—"}</td>
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="px-4 py-2 text-slate-800 font-medium">{c.company}</td>
+                        <td className="px-4 py-2 text-slate-500 font-mono text-[11px]">{c.phone || "—"}</td>
+                        <td className="px-4 py-2 text-slate-500">{c.industry || "—"}</td>
+                        <td className="px-4 py-2 text-slate-500">{c.employees || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -159,7 +240,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
         </div>
 
         {/* ボタン */}
-        <div className="flex gap-3 px-7 py-5 border-t border-white/5 shrink-0">
+        <div className="flex gap-3 px-7 py-5 border-t border-slate-100 shrink-0">
           {preview.length === 0 ? (
             <button
               onClick={handleAnalyze}
@@ -173,11 +254,13 @@ export default function ImportModal({ onImport, onClose }: Props) {
               onClick={doImport}
               className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl py-3 text-sm font-semibold transition-all"
             >
-              {preview.length}件を「{listName.trim() || "新しいリスト"}」に追加
+              {appendMode
+                ? `${preview.length}件を「${appendListName}」に追加`
+                : `${preview.length}件を「${listName.trim() || "新しいリスト"}」に追加`}
             </button>
           )}
           <button onClick={onClose}
-            className="px-5 bg-white/5 hover:bg-white/10 text-white/60 rounded-xl py-3 text-sm transition-all">
+            className="px-5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl py-3 text-sm transition-all">
             キャンセル
           </button>
         </div>

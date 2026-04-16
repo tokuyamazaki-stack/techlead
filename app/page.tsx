@@ -1,24 +1,40 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { Company, Tab, TagConfig, CallList } from "./lib/types";
-import { RESULT_CONFIG, DEFAULT_TAGS } from "./lib/types";
+import type { Company, Tab, TagConfig, CallList, UserSettings, GoalConfig } from "./lib/types";
+import { RESULT_CONFIG, DEFAULT_TAGS, DEFAULT_GOALS } from "./lib/types";
 import ImportModal from "./components/ImportModal";
 import ResultModal from "./components/ResultModal";
+import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import Analytics from "./components/Analytics";
+import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
+import type { ReportFormField } from "./lib/types";
+
+// フォームURLのIDをキーに、既知の項目マッピングを定義
+const KNOWN_FORM_CONFIGS: Record<string, ReportFormField[]> = {
+  "1FAIpQLSegAjKpn-PTVwRyRA6FfdflVNKdD0TNxi5ledYAonwlA9dHUw": [
+    { entryId: "entry.1181361572", dataType: "assignee" },   // 名前
+    { entryId: "entry.637469353",  dataType: "date" },       // 出社日
+    { entryId: "entry.349857007",  dataType: "totalCalls" }, // コール数
+    { entryId: "entry.235601849",  dataType: "material" },   // 資料送付数
+    { entryId: "entry.1279150079", dataType: "appo" },       // 獲得アポ数
+  ],
+};
 
 const LISTS_KEY = "techlead_lists";
 const TAGS_KEY = "techlead_tags";
+const USER_KEY = "techlead_user";
+const GOALS_KEY = "techlead_goals";
+
+const DEFAULT_USER: UserSettings = { name: "", calendarUrl: "", reportFormUrl: "", phone: "", email: "" };
 
 function load<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  } catch { return fallback; }
 }
 
 function todayStr() {
@@ -28,18 +44,59 @@ function todayStr() {
 export default function Home() {
   const [lists, setLists] = useState<CallList[]>([]);
   const [tagConfig, setTagConfig] = useState<TagConfig>(DEFAULT_TAGS);
+  const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_USER);
+  const [goalConfig, setGoalConfig] = useState<GoalConfig>(DEFAULT_GOALS);
   const [tab, setTab] = useState<Tab>("list");
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Company | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [appendingToListId, setAppendingToListId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
   const [search, setSearch] = useState("");
   const [filterResult, setFilterResult] = useState<string>("すべて");
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const savedLists = load<CallList[]>(LISTS_KEY, []);
-    setLists(savedLists);
-    setTagConfig(load(TAGS_KEY, DEFAULT_TAGS));
-    if (savedLists.length > 0) setSelectedListId(savedLists[0].id);
+    const savedUser = load<UserSettings>(USER_KEY, DEFAULT_USER);
+
+    // 初回起動（データなし）はデモデータを自動ロード
+    // 既知フォームURLなら自動でフィールドマッピングを設定
+    function applyKnownFormConfig(user: UserSettings): UserSettings {
+      if (!user.reportFormUrl) return user;
+      if (user.reportFormFields && user.reportFormFields.length > 0) return user;
+      const formId = user.reportFormUrl.match(/\/e\/([^/]+)\//)?.[1];
+      if (formId && KNOWN_FORM_CONFIGS[formId]) {
+        return { ...user, reportFormFields: KNOWN_FORM_CONFIGS[formId] };
+      }
+      return user;
+    }
+
+    if (savedLists.length === 0) {
+      setLists(DEMO_LISTS);
+      setUserSettings(DEMO_USER);
+      setTagConfig(load(TAGS_KEY, DEFAULT_TAGS));
+      setGoalConfig(load(GOALS_KEY, DEFAULT_GOALS));
+      setSelectedListId(DEMO_LISTS[0].id);
+      localStorage.setItem(LISTS_KEY, JSON.stringify(DEMO_LISTS));
+      localStorage.setItem(USER_KEY, JSON.stringify(DEMO_USER));
+    } else {
+      setLists(savedLists);
+      setTagConfig(load(TAGS_KEY, DEFAULT_TAGS));
+      setGoalConfig(load(GOALS_KEY, DEFAULT_GOALS));
+      setSelectedListId(savedLists[0].id);
+      // 既知フォーム自動設定
+      const migratedUser = applyKnownFormConfig(savedUser);
+      setUserSettings(migratedUser);
+      if (migratedUser !== savedUser) {
+        localStorage.setItem(USER_KEY, JSON.stringify(migratedUser));
+      }
+      if (!savedUser.name) setTimeout(() => setShowSettings(true), 300);
+    }
+
+    setInitialized(true);
   }, []);
 
   function saveLists(next: CallList[]) {
@@ -52,10 +109,32 @@ export default function Home() {
     localStorage.setItem(TAGS_KEY, JSON.stringify(next));
   }
 
-  function handleImport(name: string, companies: Company[]) {
+  function saveUserSettings(next: UserSettings) {
+    setUserSettings(next);
+    localStorage.setItem(USER_KEY, JSON.stringify(next));
+  }
+
+  function updateGoals(next: GoalConfig) {
+    setGoalConfig(next);
+    localStorage.setItem(GOALS_KEY, JSON.stringify(next));
+  }
+
+  function resetToDemo() {
+    saveLists(DEMO_LISTS);
+    saveUserSettings(DEMO_USER);
+    updateTags(DEFAULT_TAGS);
+    setGoalConfig(DEMO_GOALS);
+    localStorage.setItem(GOALS_KEY, JSON.stringify(DEMO_GOALS));
+    setSelectedListId(DEMO_LISTS[0].id);
+    setSelectedIndex(null);
+    setSearch("");
+    setFilterResult("すべて");
+  }
+
+  function handleImport(meta: Omit<CallList, "id" | "companies" | "createdAt">, companies: Company[]) {
     const newList: CallList = {
       id: `list-${Date.now()}`,
-      name,
+      ...meta,
       companies,
       createdAt: new Date().toISOString(),
     };
@@ -65,22 +144,41 @@ export default function Home() {
     setShowImport(false);
   }
 
+  function handleAppend(companies: Company[]) {
+    if (!appendingToListId) return;
+    const next = lists.map((l) =>
+      l.id === appendingToListId ? { ...l, companies: [...l.companies, ...companies] } : l
+    );
+    saveLists(next);
+    setAppendingToListId(null);
+  }
+
   function handleSaveResult(updated: Company) {
     const next = lists.map((l) => ({
       ...l,
       companies: l.companies.map((c) => (c.id === updated.id ? updated : c)),
     }));
     saveLists(next);
-    setSelected(null);
+    setSelectedIndex(null);
   }
 
   function handleDeleteList(id: string) {
     if (!confirm("このリストを削除しますか？")) return;
     const next = lists.filter((l) => l.id !== id);
     saveLists(next);
-    if (selectedListId === id) {
-      setSelectedListId(next.length > 0 ? next[0].id : null);
-    }
+    setSelectedListId(next.length > 0 ? next[0].id : null);
+  }
+
+  function startEditListName(list: CallList) {
+    setEditingListId(list.id);
+    setEditingName(list.name);
+  }
+
+  function saveListName(id: string) {
+    if (!editingName.trim()) return;
+    const next = lists.map((l) => l.id === id ? { ...l, name: editingName.trim() } : l);
+    saveLists(next);
+    setEditingListId(null);
   }
 
   const today = todayStr();
@@ -112,26 +210,28 @@ export default function Home() {
       });
   }, [currentList, filterResult, search, today]);
 
+  const selected = selectedIndex !== null ? filtered[selectedIndex] ?? null : null;
+
   const todayCallCount = allCompanies.flatMap((c) =>
     c.callHistory.filter((h) => h.date === today)
   ).length;
-
   const todayNextCount = currentList?.companies.filter((c) => c.nextDate === today).length ?? 0;
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
 
+  if (!initialized) return null;
+
   return (
-    <div className="min-h-screen bg-[#0d0d0f] text-white font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Header */}
-      <header className="border-b border-white/10 px-8 py-4 flex items-center justify-between sticky top-0 bg-[#0d0d0f]/95 backdrop-blur-sm z-30">
+      <header className="border-b border-slate-200 px-8 py-3.5 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
             TL
           </div>
-          <span className="text-lg font-semibold tracking-wide">TechLead</span>
+          <span className="text-lg font-bold tracking-tight text-slate-800">TechLead</span>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
           {[
             { id: "list" as Tab, label: "コールリスト" },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
@@ -139,60 +239,109 @@ export default function Home() {
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t.id ? "bg-white text-black" : "text-white/50 hover:text-white/80"
+                tab === t.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}>
               {t.label}
             </button>
           ))}
         </div>
 
-        <button onClick={() => setShowImport(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-sm font-medium transition-all">
-          ＋ リストを取込
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm transition-all"
+          >
+            <span className="w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
+              {userSettings.name ? userSettings.name[0] : "?"}
+            </span>
+            <span className="text-slate-600 text-xs">
+              {userSettings.name || "名前を設定"}
+            </span>
+          </button>
+          <button onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium transition-all shadow-sm">
+            ＋ リストを取込
+          </button>
+        </div>
       </header>
 
       <div className="px-8 py-6 max-w-7xl mx-auto">
         {tab === "list" && (
           <>
             {lists.length === 0 ? (
-              /* 空の状態 */
-              <div className="rounded-xl border border-dashed border-white/10 py-32 text-center">
-                <p className="text-white/20 text-lg mb-2">リストがありません</p>
-                <p className="text-white/10 text-sm mb-6">「リストを取込」ボタンでSansanから企業を追加してください</p>
+              <div className="rounded-xl border border-dashed border-slate-300 py-32 text-center bg-white">
+                <p className="text-slate-400 text-lg mb-2">リストがありません</p>
+                <p className="text-slate-300 text-sm mb-6">「リストを取込」ボタンでSansanから企業を追加してください</p>
                 <button onClick={() => setShowImport(true)}
-                  className="px-6 py-3 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold transition-all">
+                  className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition-all shadow-sm">
                   ＋ リストを取込
                 </button>
               </div>
             ) : (
               <>
-                {/* リスト一覧（横スクロール） */}
+                {/* リスト一覧 */}
                 <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
                   {lists.map((l) => (
-                    <button
+                    <div
                       key={l.id}
                       onClick={() => { setSelectedListId(l.id); setFilterResult("すべて"); setSearch(""); }}
-                      className={`flex-shrink-0 rounded-xl px-5 py-3.5 text-left transition-all border group relative ${
+                      className={`flex-shrink-0 rounded-xl px-5 py-4 min-w-[148px] text-left transition-all border group relative cursor-pointer ${
                         selectedListId === l.id
-                          ? "bg-violet-900/40 border-violet-500/50"
-                          : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06]"
+                          ? "bg-violet-50 border-violet-300 shadow-sm"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
                       }`}
                     >
-                      <div className="text-sm font-semibold mb-1 pr-5">{l.name}</div>
-                      <div className="text-xs text-white/40">{l.companies.length}件</div>
-                      {/* 削除ボタン */}
-                      <span
-                        onClick={(e) => { e.stopPropagation(); handleDeleteList(l.id); }}
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all text-xs px-1 cursor-pointer"
-                      >
-                        ✕
-                      </span>
-                    </button>
+                      {editingListId === l.id ? (
+                        <input
+                          autoFocus
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={() => saveListName(l.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveListName(l.id);
+                            if (e.key === "Escape") setEditingListId(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="bg-transparent border-b border-violet-400 text-base font-bold text-slate-900 focus:outline-none w-32 mb-1"
+                        />
+                      ) : (
+                        <>
+                          <div
+                            className="text-base font-bold mb-2 pr-10 leading-tight text-slate-800"
+                            onDoubleClick={(e) => { e.stopPropagation(); startEditListName(l); }}
+                            title="ダブルクリックで名前を編集"
+                          >
+                            {l.industry || l.name}
+                          </div>
+                          <div className="space-y-0.5">
+                            {(l.fiscalMonthFrom || l.fiscalMonthTo) && (
+                              <div className="text-xs text-slate-400">
+                                決算 {l.fiscalMonthFrom ? `${l.fiscalMonthFrom}月` : "—"}〜{l.fiscalMonthTo ? `${l.fiscalMonthTo}月` : "—"}
+                              </div>
+                            )}
+                            {(l.revenueFrom || l.revenueTo) && (
+                              <div className="text-xs text-slate-400">
+                                売上 {l.revenueFrom || "—"}〜{l.revenueTo || "—"}
+                              </div>
+                            )}
+                            {l.industry && l.name !== l.industry && (
+                              <div className="text-[10px] text-slate-300">{l.name}</div>
+                            )}
+                            <div className="text-xs text-slate-400 pt-1">{l.companies.length}件</div>
+                          </div>
+                        </>
+                      )}
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-all">
+                        <span onClick={(e) => { e.stopPropagation(); startEditListName(l); }}
+                          className="text-slate-300 hover:text-violet-500 text-xs px-1 cursor-pointer" title="名前を編集">✎</span>
+                        <span onClick={(e) => { e.stopPropagation(); handleDeleteList(l.id); }}
+                          className="text-slate-300 hover:text-red-500 text-xs px-1 cursor-pointer" title="削除">✕</span>
+                      </div>
+                    </div>
                   ))}
                   <button
                     onClick={() => setShowImport(true)}
-                    className="flex-shrink-0 rounded-xl px-5 py-3.5 border border-dashed border-white/10 hover:border-violet-500/50 text-white/30 hover:text-violet-400 transition-all text-sm"
+                    className="flex-shrink-0 rounded-xl px-5 py-3.5 border border-dashed border-slate-300 hover:border-violet-400 text-slate-400 hover:text-violet-500 transition-all text-sm bg-white"
                   >
                     ＋ 追加
                   </button>
@@ -208,13 +357,11 @@ export default function Home() {
                         { label: "本日コール数", value: todayCallCount, highlight: false },
                         { label: "アポ獲得（累計）", value: appoCount, highlight: appoCount > 0 },
                       ].map((s) => (
-                        <div key={s.label} className={`rounded-xl p-5 border ${
-                          s.highlight
-                            ? "bg-violet-900/30 border-violet-700/40"
-                            : "bg-white/[0.03] border-white/10"
+                        <div key={s.label} className={`rounded-xl p-5 border shadow-sm ${
+                          s.highlight ? "bg-violet-50 border-violet-200" : "bg-white border-slate-200"
                         }`}>
-                          <div className="text-3xl font-bold">{s.value}</div>
-                          <div className="text-xs text-white/40 mt-1">{s.label}</div>
+                          <div className={`text-3xl font-bold ${s.highlight ? "text-violet-600" : "text-slate-900"}`}>{s.value}</div>
+                          <div className="text-xs text-slate-400 mt-1">{s.label}</div>
                         </div>
                       ))}
                     </div>
@@ -225,71 +372,81 @@ export default function Home() {
                         {FILTER_OPTIONS.map((f) => (
                           <button key={f} onClick={() => setFilterResult(f)}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                              filterResult === f
-                                ? "bg-white text-black"
-                                : f === "本日ネクスト" && todayNextCount > 0
-                                ? "bg-violet-800/50 text-violet-300 hover:bg-violet-700/50"
-                                : "bg-white/5 text-white/50 hover:bg-white/10"
+                              filterResult === f ? "bg-slate-800 text-white"
+                              : f === "本日ネクスト" && todayNextCount > 0 ? "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                             }`}>
                             {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
                           </button>
                         ))}
                       </div>
-                      <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                        placeholder="企業名・電話番号で検索..."
-                        className="ml-auto bg-white/5 border border-white/10 rounded-lg px-4 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500 transition-colors w-56" />
+                      <div className="ml-auto flex items-center gap-2">
+                        <button
+                          onClick={() => setAppendingToListId(currentList.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-lg text-xs transition-all"
+                        >
+                          ＋ 企業を追加
+                        </button>
+                        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                          placeholder="企業名・電話番号で検索..."
+                          className="bg-white border border-slate-200 rounded-lg px-4 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all w-56" />
+                      </div>
                     </div>
 
                     {/* Table */}
-                    <div className="rounded-xl border border-white/10 overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm bg-white">
+                      <table className="w-full text-sm min-w-[900px]">
                         <thead>
-                          <tr className="bg-white/5 text-white/40 text-xs">
-                            <th className="text-left px-4 py-3 font-medium">会社名</th>
-                            <th className="text-left px-4 py-3 font-medium">電話番号</th>
-                            <th className="text-left px-4 py-3 font-medium">業種</th>
-                            <th className="text-left px-4 py-3 font-medium">従業員数</th>
-                            <th className="text-left px-4 py-3 font-medium">結果</th>
-                            <th className="text-left px-4 py-3 font-medium">次回連絡日</th>
+                          <tr className="bg-slate-50 text-slate-500 text-xs border-b border-slate-200">
+                            <th className="text-left px-4 py-3 font-semibold">会社名</th>
+                            <th className="text-left px-4 py-3 font-semibold">電話番号</th>
+                            <th className="text-left px-4 py-3 font-semibold">業種</th>
+                            <th className="text-left px-4 py-3 font-semibold">従業員数</th>
+                            <th className="text-left px-4 py-3 font-semibold">売上</th>
+                            <th className="text-left px-4 py-3 font-semibold">住所</th>
+                            <th className="text-left px-4 py-3 font-semibold">結果</th>
+                            <th className="text-left px-4 py-3 font-semibold">次回連絡日</th>
                           </tr>
                         </thead>
                         <tbody>
                           {filtered.map((company, i) => {
                             const isNextToday = company.nextDate === today;
                             return (
-                              <tr key={company.id} onClick={() => setSelected(company)}
+                              <tr key={company.id} onClick={() => setSelectedIndex(i)}
                                 className={`cursor-pointer border-t transition-colors ${
                                   isNextToday
-                                    ? "border-violet-800/30 bg-violet-900/10 hover:bg-violet-800/20"
-                                    : "border-white/5 hover:bg-white/[0.04]" + (i % 2 !== 0 ? " bg-white/[0.015]" : "")
+                                    ? "border-violet-100 bg-violet-50/60 hover:bg-violet-50"
+                                    : "border-slate-100 hover:bg-slate-50" + (i % 2 !== 0 ? " bg-slate-50/40" : "")
                                 }`}>
                                 <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2">
-                                    {isNextToday && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
-                                    <span className="font-medium">{company.company}</span>
+                                    {isNextToday && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />}
+                                    <span className="font-semibold text-slate-800">{company.company}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3.5">
                                   {company.phone ? (
                                     <a href={`tel:${company.phone}`} onClick={(e) => e.stopPropagation()}
-                                      className="text-white/50 text-xs font-mono hover:text-violet-400 transition-colors">
+                                      className="text-slate-500 text-xs font-mono hover:text-violet-600 transition-colors">
                                       {company.phone}
                                     </a>
-                                  ) : <span className="text-white/20 text-xs">—</span>}
+                                  ) : <span className="text-slate-300 text-xs">—</span>}
                                 </td>
-                                <td className="px-4 py-3.5 text-white/50 text-xs">{company.industry || "—"}</td>
-                                <td className="px-4 py-3.5 text-white/40 text-xs">{company.employees || "—"}</td>
-                                <td className="px-4 py-3.5">
+                                <td className="px-4 py-3.5 text-slate-500 text-xs">{company.industry || "—"}</td>
+                                <td className="px-4 py-3.5 text-slate-400 text-xs">{company.employees || "—"}</td>
+                                <td className="px-4 py-3.5 text-slate-400 text-xs">{company.revenue || "—"}</td>
+                                <td className="px-4 py-3.5 text-slate-400 text-xs max-w-[160px] truncate" title={company.address}>{company.address || "—"}</td>
+                                <td className="px-4 py-3.5 whitespace-nowrap">
                                   {company.latestResult ? (
-                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${RESULT_CONFIG[company.latestResult].badge}`}>
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${RESULT_CONFIG[company.latestResult].badge}`}>
                                       {company.latestResult}
                                     </span>
                                   ) : (
-                                    <span className="text-white/20 text-xs">未コール</span>
+                                    <span className="text-slate-300 text-xs">未コール</span>
                                   )}
                                 </td>
                                 <td className="px-4 py-3.5">
-                                  <span className={`text-xs ${isNextToday ? "text-violet-400 font-semibold" : "text-white/40"}`}>
+                                  <span className={`text-xs ${isNextToday ? "text-violet-600 font-semibold" : "text-slate-400"}`}>
                                     {company.nextDate || "—"}
                                   </span>
                                 </td>
@@ -298,7 +455,7 @@ export default function Home() {
                           })}
                           {filtered.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="px-5 py-12 text-center text-white/20 text-sm">
+                              <td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-sm">
                                 条件に一致する企業がありません
                               </td>
                             </tr>
@@ -313,19 +470,46 @@ export default function Home() {
           </>
         )}
 
-        {tab === "report" && <DailyReport companies={allCompanies} />}
-        {tab === "analytics" && <Analytics companies={allCompanies} />}
+        {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
+        {tab === "analytics" && <Analytics companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={updateGoals} />}
       </div>
 
       {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
 
-      {selected && (
+      {appendingToListId && (
+        <ImportModal
+          appendMode
+          appendListName={lists.find((l) => l.id === appendingToListId)?.name ?? ""}
+          onAppend={handleAppend}
+          onImport={handleImport}
+          onClose={() => setAppendingToListId(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          current={userSettings}
+          onSave={saveUserSettings}
+          onClose={() => setShowSettings(false)}
+          onResetDemo={resetToDemo}
+        />
+      )}
+
+      {selected && selectedIndex !== null && (
         <ResultModal
+          key={selectedIndex}
           company={selected}
           tagConfig={tagConfig}
+          userSettings={userSettings}
           onSave={handleSaveResult}
           onUpdateTags={updateTags}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedIndex(null)}
+          currentIndex={selectedIndex}
+          totalCount={filtered.length}
+          hasPrev={selectedIndex > 0}
+          hasNext={selectedIndex < filtered.length - 1}
+          onPrev={() => setSelectedIndex(selectedIndex - 1)}
+          onNext={() => setSelectedIndex(selectedIndex + 1)}
         />
       )}
     </div>

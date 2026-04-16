@@ -22,7 +22,11 @@ export async function POST(req: NextRequest) {
   "address": "住所（なければ空文字）",
   "industry": "業種（なければ空文字）",
   "subIndustry": "業種の中分類（なければ空文字）",
-  "employees": "従業員数（なければ空文字）"
+  "employees": "従業員数（なければ空文字）",
+  "revenue": "売上・年商（なければ空文字、例：10億円、300億円以上）",
+  "contactName": "担当者名・人物名（なければ空文字、例：田中 太郎）",
+  "directPhone": "担当者の直通電話（なければ空文字）",
+  "contactEmail": "担当者のメールアドレス（なければ空文字）"
 }
 
 ルール：

@@ -8,11 +8,56 @@ export type ResultType =
 
 export type Tab = "list" | "report" | "analytics";
 
+export type FormFieldType =
+  | "none"
+  | "date"
+  | "assignee"
+  | "totalCalls"
+  | "appo"
+  | "material"
+  | "recall"
+  | "absent"
+  | "ngTotal"
+  | "appoRate";
+
+export const FORM_FIELD_LABELS: Record<FormFieldType, string> = {
+  none:       "使わない",
+  date:       "今日の日付",
+  assignee:   "担当者名",
+  totalCalls: "総コール数",
+  appo:       "アポ獲得数",
+  material:   "資料送付数",
+  recall:     "再コール数",
+  absent:     "担当者不在数",
+  ngTotal:    "NG合計",
+  appoRate:   "アポ率（%）",
+};
+
+export interface ReportFormField {
+  entryId: string;      // 例: "entry.1234567890"
+  dataType: FormFieldType;
+}
+
+export interface UserSettings {
+  name: string;
+  calendarUrl: string;
+  reportFormUrl: string;
+  phone: string;   // 電話番号（メール署名用）
+  email: string;   // メールアドレス（メール署名用）
+  reportFormFields?: ReportFormField[];  // 日報フォーム自動入力マッピング
+}
+
 export interface CallList {
   id: string;
   name: string;
   companies: Company[];
   createdAt: string;
+  // 取込条件メタデータ（任意）
+  industry?: string;        // 業界（例：不動産仲介）
+  fiscalMonthFrom?: string; // 決算月 開始（例：3）
+  fiscalMonthTo?: string;   // 決算月 終了（例：9）
+  revenueFrom?: string;     // 売上 下限（例：10億）
+  revenueTo?: string;       // 売上 上限（例：100億）
 }
 
 export interface CallRecord {
@@ -24,7 +69,14 @@ export interface CallRecord {
   products: string[];    // 提案商材
   challenges: string[];  // 相手の課題
   interests: string[];   // 興味を持ったポイント
+  ngReason?: string;     // NG理由（担当NG・受付NGのみ）
 }
+
+// NG理由のプリセット
+export const NG_REASONS: Record<"担当NG" | "受付NG", string[]> = {
+  担当NG: ["予算なし", "競合他社と契約中", "興味なし", "タイミングNG", "担当者変更", "廃業・移転"],
+  受付NG: ["電話お断り", "担当者不在が続く", "窓口NG", "リスト掲載NG", "番号違い"],
+};
 
 export interface Company {
   id: string;
@@ -143,3 +195,18 @@ export const RESULTS: ResultType[] = [
 
 // 商材・課題・興味ポイントを記録すべき結果
 export const DETAIL_RESULTS: ResultType[] = ["アポ獲得", "資料送付", "再コール"];
+
+// 目標設定
+export interface GoalConfig {
+  dailyCallsPerPerson: number;   // 1人あたりの1日コール目標
+  monthlyAppoPerPerson: number;  // 1人あたりの月間アポ目標
+  teamDailyCalls: number;        // チーム1日コール目標
+  teamMonthlyAppo: number;       // チーム月間アポ目標
+}
+
+export const DEFAULT_GOALS: GoalConfig = {
+  dailyCallsPerPerson: 30,
+  monthlyAppoPerPerson: 5,
+  teamDailyCalls: 100,
+  teamMonthlyAppo: 20,
+};
