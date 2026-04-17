@@ -223,49 +223,51 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Header */}
-      <header className="border-b border-slate-200 px-8 py-3.5 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30 shadow-sm">
-        <div className="flex items-center gap-3">
+      <header className="border-b border-slate-200 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-30 shadow-sm gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
             TL
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-800">TechLead</span>
+          <span className="text-base md:text-lg font-bold tracking-tight text-slate-800 hidden sm:block">TechLead</span>
         </div>
 
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+        <div className="flex gap-0.5 md:gap-1 bg-slate-100 rounded-xl p-1">
           {[
-            { id: "list" as Tab, label: "コールリスト" },
-            { id: "report" as Tab, label: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
-            { id: "analytics" as Tab, label: "分析" },
+            { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
+            { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
+            { id: "analytics" as Tab, label: "分析", labelFull: "分析" },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-2.5 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
                 tab === t.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}>
-              {t.label}
+              <span className="sm:hidden">{t.label}</span>
+              <span className="hidden sm:inline">{t.labelFull}</span>
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm transition-all"
+            className="flex items-center gap-2 px-2 md:px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm transition-all"
           >
-            <span className="w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
+            <span className="w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
               {userSettings.name ? userSettings.name[0] : "?"}
             </span>
-            <span className="text-slate-600 text-xs">
+            <span className="text-slate-600 text-xs hidden md:block">
               {userSettings.name || "名前を設定"}
             </span>
           </button>
           <button onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium transition-all shadow-sm">
-            ＋ リストを取込
+            className="flex items-center gap-1.5 px-3 md:px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs md:text-sm font-medium transition-all shadow-sm">
+            <span>＋</span>
+            <span className="hidden sm:inline">リストを取込</span>
           </button>
         </div>
       </header>
 
-      <div className="px-8 py-6 max-w-7xl mx-auto">
+      <div className="px-4 md:px-8 py-4 md:py-6 max-w-7xl mx-auto">
         {tab === "list" && (
           <>
             {lists.length === 0 ? (
@@ -350,7 +352,7 @@ export default function Home() {
                 {currentList && (
                   <>
                     {/* Stats */}
-                    <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
                       {[
                         { label: "総件数", value: currentList.companies.length, highlight: false },
                         { label: "本日ネクスト", value: todayNextCount, highlight: todayNextCount > 0 },

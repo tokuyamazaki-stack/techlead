@@ -140,7 +140,7 @@ ${reportMemo ? `\n■ 所感・メモ\n${reportMemo}` : ""}`.trim();
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
           <div className="text-3xl font-bold text-slate-900">{totalCalls}</div>
           <div className="text-xs text-slate-500 mt-1">本日の総コール数</div>
