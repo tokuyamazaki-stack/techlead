@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import * as db from "../lib/db";
 
 interface Props {
@@ -14,13 +14,20 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
+  const tokenRef = useRef<HTMLInputElement>(null);
 
   async function handleCreate() {
-    if (!workspaceName.trim()) return;
+    const name = nameRef.current?.value.trim() || workspaceName.trim();
+    if (!name) {
+      setError("チーム名を入力してください");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const ws = await db.createWorkspace(userId, workspaceName.trim());
+      const name = nameRef.current?.value.trim() || workspaceName.trim();
+      const ws = await db.createWorkspace(userId, name);
       onReady(ws);
     } catch (e) {
       setError("チームの作成に失敗しました。もう一度試してください。");
@@ -31,11 +38,16 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
   }
 
   async function handleJoin() {
-    if (!token.trim()) return;
+    const tok = tokenRef.current?.value.trim() || token.trim();
+    if (!tok) {
+      setError("招待コードを入力してください");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const ws = await db.joinByToken(token.trim(), userId);
+      const tok = tokenRef.current?.value.trim() || token.trim();
+      const ws = await db.joinByToken(tok, userId);
       if (!ws) {
         setError("招待コードが正しくありません");
         return;
@@ -85,17 +97,20 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
             <button onClick={() => setMode("choose")} className="text-xs text-slate-400 mb-4 hover:text-slate-600">← 戻る</button>
             <h2 className="text-base font-semibold text-slate-900 mb-1">チーム名を決める</h2>
             <p className="text-xs text-slate-400 mb-6">会社名やチーム名を入力してください</p>
+            {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
             <input
+              ref={nameRef}
               type="text"
               value={workspaceName}
-              onChange={(e) => setWorkspaceName(e.target.value)}
+              onChange={(e) => { setWorkspaceName(e.target.value); setError(""); }}
               placeholder="例：R&Dインサイドセールスチーム"
+              autoComplete="off"
               autoFocus
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors mb-4"
             />
             <button
               onClick={handleCreate}
-              disabled={!workspaceName.trim() || loading}
+              disabled={loading}
               className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-40 text-white rounded-xl py-3 text-sm font-semibold transition-all"
             >
               {loading ? "作成中..." : "チームを作成"}
@@ -109,17 +124,19 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
             <h2 className="text-base font-semibold text-slate-900 mb-1">招待コードで参加</h2>
             <p className="text-xs text-slate-400 mb-6">チームのオーナーから招待コードをもらってください</p>
             <input
+              ref={tokenRef}
               type="text"
               value={token}
               onChange={(e) => { setToken(e.target.value); setError(""); }}
               placeholder="招待コードを貼り付け"
+              autoComplete="off"
               autoFocus
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors mb-2"
             />
             {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
             <button
               onClick={handleJoin}
-              disabled={!token.trim() || loading}
+              disabled={loading}
               className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-40 text-white rounded-xl py-3 text-sm font-semibold transition-all mt-2"
             >
               {loading ? "参加中..." : "参加する"}
