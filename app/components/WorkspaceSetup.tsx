@@ -30,8 +30,8 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
       const ws = await db.createWorkspace(userId, name);
       onReady(ws);
     } catch (e) {
-      setError("チームの作成に失敗しました。もう一度試してください。");
-      console.error(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`エラー: ${msg}`);
     } finally {
       setLoading(false);
     }
