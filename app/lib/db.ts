@@ -1,10 +1,110 @@
 /**
  * Supabaseとのデータのやり取りをまとめたファイル
- * localStorageの代わりにこれを使う
  */
 
 import { supabase } from "./supabase";
 import type { CallList, Company, CallRecord, UserSettings, TagConfig, GoalConfig } from "./types";
+
+export interface Workspace {
+  id: string;
+  name: string;
+  ownerId: string;
+}
+
+export interface WorkspaceMember {
+  userId: string;
+  role: string;
+  name: string;
+  email: string;
+}
+
+// ============================================================
+// ワークスペース
+// ============================================================
+
+export async function getMyWorkspace(userId: string): Promise<Workspace | null> {
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("workspace_id, workspaces(id, name, owner_id)")
+    .eq("user_id", userId)
+    .limit(1)
+    .single();
+
+  if (!data?.workspaces) return null;
+  const w = data.workspaces as unknown as { id: string; name: string; owner_id: string };
+  return { id: w.id, name: w.name, ownerId: w.owner_id };
+}
+
+export async function createWorkspace(userId: string, name: string): Promise<Workspace> {
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .insert({ name, owner_id: userId })
+    .select()
+    .single();
+
+  if (!ws) throw new Error("ワークスペースの作成に失敗しました");
+
+  await supabase.from("workspace_members").insert({
+    workspace_id: ws.id,
+    user_id: userId,
+    role: "owner",
+  });
+
+  return { id: ws.id, name: ws.name, ownerId: ws.owner_id };
+}
+
+export async function getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("user_id, role, profiles(name, email)")
+    .eq("workspace_id", workspaceId);
+
+  return (data || []).map((m) => {
+    const p = m.profiles as unknown as { name: string; email: string } | null;
+    return {
+      userId: m.user_id,
+      role: m.role,
+      name: p?.name || "",
+      email: p?.email || "",
+    };
+  });
+}
+
+// 招待トークンを作成して返す
+export async function createInvitation(workspaceId: string, userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("workspace_invitations")
+    .insert({ workspace_id: workspaceId, created_by: userId })
+    .select("token")
+    .single();
+  return data?.token ?? "";
+}
+
+// 招待トークンでワークスペースに参加
+export async function joinByToken(token: string, userId: string): Promise<Workspace | null> {
+  const { data: inv } = await supabase
+    .from("workspace_invitations")
+    .select("workspace_id")
+    .eq("token", token)
+    .single();
+
+  if (!inv) return null;
+
+  await supabase.from("workspace_members").upsert({
+    workspace_id: inv.workspace_id,
+    user_id: userId,
+    role: "member",
+  });
+
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("id, name, owner_id")
+    .eq("id", inv.workspace_id)
+    .single();
+
+  if (!ws) return null;
+  return { id: ws.id, name: ws.name, ownerId: ws.owner_id };
+}
 
 // ============================================================
 // ユーザー設定
@@ -100,14 +200,14 @@ export async function saveGoalConfig(userId: string, config: GoalConfig) {
 }
 
 // ============================================================
-// コールリスト＋企業データ（まとめて取得）
+// コールリスト（ワークスペース単位）
 // ============================================================
 
-export async function loadAllLists(userId: string): Promise<CallList[]> {
+export async function loadAllLists(workspaceId: string): Promise<CallList[]> {
   const { data: lists } = await supabase
     .from("call_lists")
     .select("*")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true });
 
   if (!lists || lists.length === 0) return [];
@@ -169,14 +269,11 @@ export async function loadAllLists(userId: string): Promise<CallList[]> {
   } as CallList));
 }
 
-// ============================================================
-// リスト保存
-// ============================================================
-
-export async function saveList(userId: string, list: CallList) {
+export async function saveList(userId: string, workspaceId: string, list: CallList) {
   await supabase.from("call_lists").upsert({
     id: list.id,
     user_id: userId,
+    workspace_id: workspaceId,
     name: list.name,
     industry: list.industry || "",
     fiscal_month_from: list.fiscalMonthFrom || "",
@@ -200,7 +297,7 @@ export async function updateListName(listId: string, name: string) {
 }
 
 // ============================================================
-// 企業保存
+// 企業・コール履歴
 // ============================================================
 
 export async function saveCompany(userId: string, listId: string, company: Company) {
@@ -224,7 +321,6 @@ export async function saveCompany(userId: string, listId: string, company: Compa
     imported_at: company.importedAt,
   });
 
-  // コール履歴を保存
   for (const record of company.callHistory) {
     await supabase.from("call_records").upsert({
       id: record.id,

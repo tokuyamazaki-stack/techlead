@@ -3,12 +3,17 @@
 import { useState } from "react";
 import type { UserSettings, ReportFormField, FormFieldType } from "../lib/types";
 import { FORM_FIELD_LABELS } from "../lib/types";
+import type { Workspace, WorkspaceMember } from "../lib/db";
+import * as db from "../lib/db";
 
 interface Props {
   current: UserSettings;
   onSave: (settings: UserSettings) => void;
   onClose: () => void;
   onResetDemo: () => void;
+  workspace?: Workspace | null;
+  userId?: string;
+  members?: WorkspaceMember[];
 }
 
 const FIELD_OPTIONS: FormFieldType[] = [
@@ -16,8 +21,10 @@ const FIELD_OPTIONS: FormFieldType[] = [
   "material", "recall", "absent", "ngTotal", "appoRate",
 ];
 
-export default function SettingsModal({ current, onSave, onClose, onResetDemo }: Props) {
+export default function SettingsModal({ current, onSave, onClose, onResetDemo, workspace, userId, members }: Props) {
   const [name, setName] = useState(current.name);
+  const [inviteToken, setInviteToken] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
   const [calendarUrl, setCalendarUrl] = useState(current.calendarUrl);
   const [reportFormUrl, setReportFormUrl] = useState(current.reportFormUrl || "");
   const [phone, setPhone] = useState(current.phone || "");
@@ -254,6 +261,60 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo }:
               キャンセル
             </button>
           </div>
+
+          {/* チームメンバー・招待 */}
+          {workspace && userId && (
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-xs text-slate-500 font-medium mb-3">チームメンバー（{workspace.name}）</p>
+              {members && members.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {members.map((m) => (
+                    <div key={m.userId} className="flex items-center gap-2 text-xs text-slate-600">
+                      <span className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-[10px] shrink-0">
+                        {m.name ? m.name[0] : m.email[0]}
+                      </span>
+                      <span>{m.name || m.email}</span>
+                      {m.role === "owner" && <span className="text-[10px] text-violet-500 bg-violet-50 px-1.5 py-0.5 rounded-full">オーナー</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {workspace.ownerId === userId && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-2">招待コードを発行してメンバーを招待</p>
+                  {inviteToken ? (
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={inviteToken}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(inviteToken);
+                          setInviteCopied(true);
+                          setTimeout(() => setInviteCopied(false), 2000);
+                        }}
+                        className="shrink-0 px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-all"
+                      >
+                        {inviteCopied ? "コピー済" : "コピー"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        const token = await db.createInvitation(workspace.id, userId);
+                        setInviteToken(token);
+                      }}
+                      className="w-full py-2 rounded-xl text-xs border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all"
+                    >
+                      招待コードを発行する
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* デモリセット */}
           <div className="mt-6 pt-5 border-t border-slate-100">

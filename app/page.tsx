@@ -9,10 +9,12 @@ import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import Analytics from "./components/Analytics";
 import AuthModal from "./components/AuthModal";
+import WorkspaceSetup from "./components/WorkspaceSetup";
 import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
 import type { ReportFormField } from "./lib/types";
 import { supabase } from "./lib/supabase";
 import * as db from "./lib/db";
+import type { Workspace, WorkspaceMember } from "./lib/db";
 import type { User } from "@supabase/supabase-js";
 
 // フォームURLのIDをキーに、既知の項目マッピングを定義
@@ -45,6 +47,8 @@ function applyKnownFormConfig(user: UserSettings): UserSettings {
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
 
   const [lists, setLists] = useState<CallList[]>([]);
   const [tagConfig, setTagConfig] = useState<TagConfig>(DEFAULT_TAGS);
@@ -76,25 +80,44 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ログイン後にデータを読み込む
+  // ログイン後にワークスペースを確認してからデータを読み込む
   useEffect(() => {
     if (!user) return;
-    loadData(user.id);
+    initWorkspace(user.id);
   }, [user]);
 
-  async function loadData(userId: string) {
+  async function initWorkspace(userId: string) {
     setLoading(true);
-    const [loadedLists, loadedSettings, loadedTags, loadedGoals] = await Promise.all([
-      db.loadAllLists(userId),
+    const ws = await db.getMyWorkspace(userId);
+    if (ws) {
+      setWorkspace(ws);
+      await loadData(userId, ws.id);
+    } else {
+      setLoading(false);
+    }
+  }
+
+  async function handleWorkspaceReady(ws: Workspace) {
+    if (!user) return;
+    setWorkspace(ws);
+    await loadData(user.id, ws.id);
+  }
+
+  async function loadData(userId: string, workspaceId: string) {
+    setLoading(true);
+    const [loadedLists, loadedSettings, loadedTags, loadedGoals, loadedMembers] = await Promise.all([
+      db.loadAllLists(workspaceId),
       db.loadUserSettings(userId),
       db.loadTagConfig(userId),
       db.loadGoalConfig(userId),
+      db.getWorkspaceMembers(workspaceId),
     ]);
 
+    setMembers(loadedMembers);
+
     if (loadedLists.length === 0) {
-      // 初回：デモデータを保存
       for (const list of DEMO_LISTS) {
-        await db.saveList(userId, list);
+        await db.saveList(userId, workspaceId, list);
       }
       setLists(DEMO_LISTS);
       setSelectedListId(DEMO_LISTS[0].id);
@@ -138,9 +161,9 @@ export default function Home() {
   }
 
   async function resetToDemo() {
-    if (!user) return;
+    if (!user || !workspace) return;
     for (const list of DEMO_LISTS) {
-      await db.saveList(user.id, list);
+      await db.saveList(user.id, workspace.id, list);
     }
     await db.saveUserSettings(user.id, DEMO_USER);
     await db.saveTagConfig(user.id, DEFAULT_TAGS);
@@ -166,7 +189,7 @@ export default function Home() {
     setLists(next);
     setSelectedListId(newList.id);
     setShowImport(false);
-    if (user) await db.saveList(user.id, newList);
+    if (user && workspace) await db.saveList(user.id, workspace.id, newList);
   }
 
   async function handleAppend(companies: Company[]) {
@@ -268,6 +291,9 @@ export default function Home() {
 
   // 未ログイン
   if (!user) return <AuthModal onAuth={() => {}} />;
+
+  // ワークスペース未設定
+  if (!workspace) return <WorkspaceSetup userId={user.id} onReady={handleWorkspaceReady} />;
 
   // データ読み込み中
   if (loading) {
@@ -559,6 +585,9 @@ export default function Home() {
           onSave={handleSaveUserSettings}
           onClose={() => setShowSettings(false)}
           onResetDemo={resetToDemo}
+          workspace={workspace}
+          userId={user.id}
+          members={members}
         />
       )}
 
