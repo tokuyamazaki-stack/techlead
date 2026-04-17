@@ -86,6 +86,31 @@ export default function Home() {
     initWorkspace(user.id);
   }, [user]);
 
+  // リアルタイム同期（他のメンバーの操作を自動反映）
+  useEffect(() => {
+    if (!workspace || !user) return;
+
+    const channel = supabase
+      .channel(`workspace-${workspace.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "call_records" }, async () => {
+        const updated = await db.loadAllLists(workspace.id);
+        if (updated.length > 0) setLists(updated);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, async () => {
+        const updated = await db.loadAllLists(workspace.id);
+        if (updated.length > 0) setLists(updated);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "call_lists" }, async () => {
+        const updated = await db.loadAllLists(workspace.id);
+        if (updated.length > 0) setLists(updated);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspace?.id]);
+
   async function initWorkspace(userId: string) {
     setLoading(true);
     const ws = await db.getMyWorkspace(userId);
