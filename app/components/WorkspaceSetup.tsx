@@ -19,23 +19,34 @@ export default function WorkspaceSetup({ userId, onReady }: Props) {
     if (!workspaceName.trim()) return;
     setLoading(true);
     setError("");
-    const ws = await db.createWorkspace(userId, workspaceName.trim());
-    onReady(ws);
-    setLoading(false);
+    try {
+      const ws = await db.createWorkspace(userId, workspaceName.trim());
+      onReady(ws);
+    } catch (e) {
+      setError("チームの作成に失敗しました。もう一度試してください。");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleJoin() {
     if (!token.trim()) return;
     setLoading(true);
     setError("");
-    const ws = await db.joinByToken(token.trim(), userId);
-    if (!ws) {
-      setError("招待コードが正しくありません");
+    try {
+      const ws = await db.joinByToken(token.trim(), userId);
+      if (!ws) {
+        setError("招待コードが正しくありません");
+        return;
+      }
+      onReady(ws);
+    } catch (e) {
+      setError("参加に失敗しました。もう一度試してください。");
+      console.error(e);
+    } finally {
       setLoading(false);
-      return;
     }
-    onReady(ws);
-    setLoading(false);
   }
 
   return (

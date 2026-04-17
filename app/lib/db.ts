@@ -36,19 +36,22 @@ export async function getMyWorkspace(userId: string): Promise<Workspace | null> 
 }
 
 export async function createWorkspace(userId: string, name: string): Promise<Workspace> {
-  const { data: ws } = await supabase
+  const { data: ws, error: wsError } = await supabase
     .from("workspaces")
     .insert({ name, owner_id: userId })
     .select()
     .single();
 
+  if (wsError) throw new Error(`ワークスペース作成エラー: ${wsError.message}`);
   if (!ws) throw new Error("ワークスペースの作成に失敗しました");
 
-  await supabase.from("workspace_members").insert({
+  const { error: memberError } = await supabase.from("workspace_members").insert({
     workspace_id: ws.id,
     user_id: userId,
     role: "owner",
   });
+
+  if (memberError) throw new Error(`メンバー追加エラー: ${memberError.message}`);
 
   return { id: ws.id, name: ws.name, ownerId: ws.owner_id };
 }
