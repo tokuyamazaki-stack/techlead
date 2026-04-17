@@ -8,40 +8,44 @@ import ResultModal from "./components/ResultModal";
 import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import Analytics from "./components/Analytics";
+import AuthModal from "./components/AuthModal";
 import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
 import type { ReportFormField } from "./lib/types";
+import { supabase } from "./lib/supabase";
+import * as db from "./lib/db";
+import type { User } from "@supabase/supabase-js";
 
 // フォームURLのIDをキーに、既知の項目マッピングを定義
 const KNOWN_FORM_CONFIGS: Record<string, ReportFormField[]> = {
   "1FAIpQLSegAjKpn-PTVwRyRA6FfdflVNKdD0TNxi5ledYAonwlA9dHUw": [
-    { entryId: "entry.1181361572", dataType: "assignee" },   // 名前
-    { entryId: "entry.637469353",  dataType: "date" },       // 出社日
-    { entryId: "entry.349857007",  dataType: "totalCalls" }, // コール数
-    { entryId: "entry.235601849",  dataType: "material" },   // 資料送付数
-    { entryId: "entry.1279150079", dataType: "appo" },       // 獲得アポ数
+    { entryId: "entry.1181361572", dataType: "assignee" },
+    { entryId: "entry.637469353",  dataType: "date" },
+    { entryId: "entry.349857007",  dataType: "totalCalls" },
+    { entryId: "entry.235601849",  dataType: "material" },
+    { entryId: "entry.1279150079", dataType: "appo" },
   ],
 };
 
-const LISTS_KEY = "techlead_lists";
-const TAGS_KEY = "techlead_tags";
-const USER_KEY = "techlead_user";
-const GOALS_KEY = "techlead_goals";
-
 const DEFAULT_USER: UserSettings = { name: "", calendarUrl: "", reportFormUrl: "", phone: "", email: "" };
-
-function load<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch { return fallback; }
-}
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
+function applyKnownFormConfig(user: UserSettings): UserSettings {
+  if (!user.reportFormUrl) return user;
+  if (user.reportFormFields && user.reportFormFields.length > 0) return user;
+  const formId = user.reportFormUrl.match(/\/e\/([^/]+)\//)?.[1];
+  if (formId && KNOWN_FORM_CONFIGS[formId]) {
+    return { ...user, reportFormFields: KNOWN_FORM_CONFIGS[formId] };
+  }
+  return user;
+}
+
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [lists, setLists] = useState<CallList[]>([]);
   const [tagConfig, setTagConfig] = useState<TagConfig>(DEFAULT_TAGS);
   const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_USER);
@@ -56,82 +60,102 @@ export default function Home() {
   const [editingName, setEditingName] = useState("");
   const [search, setSearch] = useState("");
   const [filterResult, setFilterResult] = useState<string>("すべて");
-  const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(false);
 
+  // 認証状態の監視
   useEffect(() => {
-    const savedLists = load<CallList[]>(LISTS_KEY, []);
-    const savedUser = load<UserSettings>(USER_KEY, DEFAULT_USER);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
 
-    // 初回起動（データなし）はデモデータを自動ロード
-    // 既知フォームURLなら自動でフィールドマッピングを設定
-    function applyKnownFormConfig(user: UserSettings): UserSettings {
-      if (!user.reportFormUrl) return user;
-      if (user.reportFormFields && user.reportFormFields.length > 0) return user;
-      const formId = user.reportFormUrl.match(/\/e\/([^/]+)\//)?.[1];
-      if (formId && KNOWN_FORM_CONFIGS[formId]) {
-        return { ...user, reportFormFields: KNOWN_FORM_CONFIGS[formId] };
-      }
-      return user;
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
-    if (savedLists.length === 0) {
-      setLists(DEMO_LISTS);
-      setUserSettings(DEMO_USER);
-      setTagConfig(load(TAGS_KEY, DEFAULT_TAGS));
-      setGoalConfig(load(GOALS_KEY, DEFAULT_GOALS));
-      setSelectedListId(DEMO_LISTS[0].id);
-      localStorage.setItem(LISTS_KEY, JSON.stringify(DEMO_LISTS));
-      localStorage.setItem(USER_KEY, JSON.stringify(DEMO_USER));
-    } else {
-      setLists(savedLists);
-      setTagConfig(load(TAGS_KEY, DEFAULT_TAGS));
-      setGoalConfig(load(GOALS_KEY, DEFAULT_GOALS));
-      setSelectedListId(savedLists[0].id);
-      // 既知フォーム自動設定
-      const migratedUser = applyKnownFormConfig(savedUser);
-      setUserSettings(migratedUser);
-      if (migratedUser !== savedUser) {
-        localStorage.setItem(USER_KEY, JSON.stringify(migratedUser));
-      }
-      if (!savedUser.name) setTimeout(() => setShowSettings(true), 300);
-    }
-
-    setInitialized(true);
+    return () => subscription.unsubscribe();
   }, []);
 
-  function saveLists(next: CallList[]) {
+  // ログイン後にデータを読み込む
+  useEffect(() => {
+    if (!user) return;
+    loadData(user.id);
+  }, [user]);
+
+  async function loadData(userId: string) {
+    setLoading(true);
+    const [loadedLists, loadedSettings, loadedTags, loadedGoals] = await Promise.all([
+      db.loadAllLists(userId),
+      db.loadUserSettings(userId),
+      db.loadTagConfig(userId),
+      db.loadGoalConfig(userId),
+    ]);
+
+    if (loadedLists.length === 0) {
+      // 初回：デモデータを保存
+      for (const list of DEMO_LISTS) {
+        await db.saveList(userId, list);
+      }
+      setLists(DEMO_LISTS);
+      setSelectedListId(DEMO_LISTS[0].id);
+    } else {
+      setLists(loadedLists);
+      setSelectedListId(loadedLists[0].id);
+    }
+
+    if (loadedSettings) {
+      const migrated = applyKnownFormConfig(loadedSettings);
+      setUserSettings(migrated);
+      if (!loadedSettings.name) setTimeout(() => setShowSettings(true), 300);
+    } else {
+      await db.saveUserSettings(userId, DEMO_USER);
+      setUserSettings(DEMO_USER);
+      setTimeout(() => setShowSettings(true), 300);
+    }
+
+    setTagConfig(loadedTags ?? DEFAULT_TAGS);
+    setGoalConfig(loadedGoals ?? DEMO_GOALS);
+    setLoading(false);
+  }
+
+  async function handleSaveLists(next: CallList[]) {
     setLists(next);
-    localStorage.setItem(LISTS_KEY, JSON.stringify(next));
   }
 
-  function updateTags(next: TagConfig) {
+  async function handleUpdateTags(next: TagConfig) {
     setTagConfig(next);
-    localStorage.setItem(TAGS_KEY, JSON.stringify(next));
+    if (user) await db.saveTagConfig(user.id, next);
   }
 
-  function saveUserSettings(next: UserSettings) {
+  async function handleSaveUserSettings(next: UserSettings) {
     setUserSettings(next);
-    localStorage.setItem(USER_KEY, JSON.stringify(next));
+    if (user) await db.saveUserSettings(user.id, next);
   }
 
-  function updateGoals(next: GoalConfig) {
+  async function handleUpdateGoals(next: GoalConfig) {
     setGoalConfig(next);
-    localStorage.setItem(GOALS_KEY, JSON.stringify(next));
+    if (user) await db.saveGoalConfig(user.id, next);
   }
 
-  function resetToDemo() {
-    saveLists(DEMO_LISTS);
-    saveUserSettings(DEMO_USER);
-    updateTags(DEFAULT_TAGS);
+  async function resetToDemo() {
+    if (!user) return;
+    for (const list of DEMO_LISTS) {
+      await db.saveList(user.id, list);
+    }
+    await db.saveUserSettings(user.id, DEMO_USER);
+    await db.saveTagConfig(user.id, DEFAULT_TAGS);
+    await db.saveGoalConfig(user.id, DEMO_GOALS);
+    setLists(DEMO_LISTS);
+    setUserSettings(DEMO_USER);
+    setTagConfig(DEFAULT_TAGS);
     setGoalConfig(DEMO_GOALS);
-    localStorage.setItem(GOALS_KEY, JSON.stringify(DEMO_GOALS));
     setSelectedListId(DEMO_LISTS[0].id);
     setSelectedIndex(null);
     setSearch("");
     setFilterResult("すべて");
   }
 
-  function handleImport(meta: Omit<CallList, "id" | "companies" | "createdAt">, companies: Company[]) {
+  async function handleImport(meta: Omit<CallList, "id" | "companies" | "createdAt">, companies: Company[]) {
     const newList: CallList = {
       id: `list-${Date.now()}`,
       ...meta,
@@ -139,34 +163,48 @@ export default function Home() {
       createdAt: new Date().toISOString(),
     };
     const next = [...lists, newList];
-    saveLists(next);
+    setLists(next);
     setSelectedListId(newList.id);
     setShowImport(false);
+    if (user) await db.saveList(user.id, newList);
   }
 
-  function handleAppend(companies: Company[]) {
+  async function handleAppend(companies: Company[]) {
     if (!appendingToListId) return;
     const next = lists.map((l) =>
       l.id === appendingToListId ? { ...l, companies: [...l.companies, ...companies] } : l
     );
-    saveLists(next);
+    setLists(next);
     setAppendingToListId(null);
+    if (user) {
+      const updatedList = next.find((l) => l.id === appendingToListId);
+      if (updatedList) {
+        for (const c of companies) {
+          await db.saveCompany(user.id, appendingToListId, c);
+        }
+      }
+    }
   }
 
-  function handleSaveResult(updated: Company) {
+  async function handleSaveResult(updated: Company) {
     const next = lists.map((l) => ({
       ...l,
       companies: l.companies.map((c) => (c.id === updated.id ? updated : c)),
     }));
-    saveLists(next);
+    setLists(next);
     setSelectedIndex(null);
+    if (user) {
+      const listId = lists.find((l) => l.companies.some((c) => c.id === updated.id))?.id;
+      if (listId) await db.saveCompany(user.id, listId, updated);
+    }
   }
 
-  function handleDeleteList(id: string) {
+  async function handleDeleteList(id: string) {
     if (!confirm("このリストを削除しますか？")) return;
     const next = lists.filter((l) => l.id !== id);
-    saveLists(next);
+    setLists(next);
     setSelectedListId(next.length > 0 ? next[0].id : null);
+    await db.deleteList(id);
   }
 
   function startEditListName(list: CallList) {
@@ -174,11 +212,18 @@ export default function Home() {
     setEditingName(list.name);
   }
 
-  function saveListName(id: string) {
+  async function saveListName(id: string) {
     if (!editingName.trim()) return;
     const next = lists.map((l) => l.id === id ? { ...l, name: editingName.trim() } : l);
-    saveLists(next);
+    setLists(next);
     setEditingListId(null);
+    await db.updateListName(id, editingName.trim());
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setLists([]);
+    setUserSettings(DEFAULT_USER);
   }
 
   const today = todayStr();
@@ -218,7 +263,23 @@ export default function Home() {
   const todayNextCount = currentList?.companies.filter((c) => c.nextDate === today).length ?? 0;
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
 
-  if (!initialized) return null;
+  // 認証チェック中
+  if (!authChecked) return null;
+
+  // 未ログイン
+  if (!user) return <AuthModal onAuth={() => {}} />;
+
+  // データ読み込み中
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-sm font-bold text-white mx-auto mb-4">TL</div>
+          <p className="text-slate-400 text-sm">データを読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
@@ -263,6 +324,10 @@ export default function Home() {
             className="flex items-center gap-1.5 px-3 md:px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs md:text-sm font-medium transition-all shadow-sm">
             <span>＋</span>
             <span className="hidden sm:inline">リストを取込</span>
+          </button>
+          <button onClick={handleLogout}
+            className="px-2 md:px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-xs transition-all hidden sm:block">
+            ログアウト
           </button>
         </div>
       </header>
@@ -457,7 +522,7 @@ export default function Home() {
                           })}
                           {filtered.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-sm">
+                              <td colSpan={8} className="px-5 py-12 text-center text-slate-400 text-sm">
                                 条件に一致する企業がありません
                               </td>
                             </tr>
@@ -473,7 +538,7 @@ export default function Home() {
         )}
 
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
-        {tab === "analytics" && <Analytics companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={updateGoals} />}
+        {tab === "analytics" && <Analytics companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={handleUpdateGoals} />}
       </div>
 
       {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
@@ -491,7 +556,7 @@ export default function Home() {
       {showSettings && (
         <SettingsModal
           current={userSettings}
-          onSave={saveUserSettings}
+          onSave={handleSaveUserSettings}
           onClose={() => setShowSettings(false)}
           onResetDemo={resetToDemo}
         />
@@ -504,7 +569,7 @@ export default function Home() {
           tagConfig={tagConfig}
           userSettings={userSettings}
           onSave={handleSaveResult}
-          onUpdateTags={updateTags}
+          onUpdateTags={handleUpdateTags}
           onClose={() => setSelectedIndex(null)}
           currentIndex={selectedIndex}
           totalCount={filtered.length}
