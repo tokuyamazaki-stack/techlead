@@ -8,6 +8,7 @@ import ResultModal from "./components/ResultModal";
 import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import Analytics from "./components/Analytics";
+import ReviewTab from "./components/ReviewTab";
 import AuthModal from "./components/AuthModal";
 import WorkspaceSetup from "./components/WorkspaceSetup";
 import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
@@ -348,6 +349,7 @@ export default function Home() {
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
             { id: "analytics" as Tab, label: "分析", labelFull: "分析" },
+            { id: "review" as Tab, label: "振り返り", labelFull: "振り返り" },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-2.5 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
@@ -590,6 +592,20 @@ export default function Home() {
 
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
         {tab === "analytics" && <Analytics companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={handleUpdateGoals} />}
+        {tab === "review" && (
+          <ReviewTab
+            lists={lists}
+            onSelectCompany={(companyId, listId) => {
+              const targetList = lists.find((l) => l.id === listId);
+              const targetCompany = targetList?.companies.find((c) => c.id === companyId);
+              setSelectedListId(listId);
+              setFilterResult("すべて");
+              setSearch(targetCompany?.company ?? "");
+              setSelectedIndex(0);
+              setTab("list");
+            }}
+          />
+        )}
       </div>
 
       {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
