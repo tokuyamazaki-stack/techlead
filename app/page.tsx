@@ -591,7 +591,7 @@ export default function Home() {
         )}
 
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
-        {tab === "analytics" && <Analytics companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={handleUpdateGoals} />}
+        {tab === "analytics" && <Analytics lists={lists} companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={handleUpdateGoals} />}
         {tab === "review" && (
           <ReviewTab
             lists={lists}
