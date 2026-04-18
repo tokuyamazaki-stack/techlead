@@ -7,7 +7,8 @@ import ImportModal from "./components/ImportModal";
 import ResultModal from "./components/ResultModal";
 import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
-import Analytics from "./components/Analytics";
+import ProgressTab from "./components/ProgressTab";
+import StrategyTab from "./components/StrategyTab";
 import ReviewTab from "./components/ReviewTab";
 import AuthModal from "./components/AuthModal";
 import WorkspaceSetup from "./components/WorkspaceSetup";
@@ -348,8 +349,9 @@ export default function Home() {
           {[
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
-            { id: "analytics" as Tab, label: "分析", labelFull: "分析" },
             { id: "review" as Tab, label: "振り返り", labelFull: "振り返り" },
+            { id: "progress" as Tab, label: "進捗", labelFull: "進捗" },
+            { id: "strategy" as Tab, label: "AI戦略", labelFull: "AI戦略" },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-2.5 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
@@ -591,7 +593,6 @@ export default function Home() {
         )}
 
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
-        {tab === "analytics" && <Analytics lists={lists} companies={allCompanies} goalConfig={goalConfig} onUpdateGoals={handleUpdateGoals} />}
         {tab === "review" && (
           <ReviewTab
             lists={lists}
@@ -605,6 +606,16 @@ export default function Home() {
               setTab("list");
             }}
           />
+        )}
+        {tab === "progress" && (
+          <ProgressTab
+            companies={allCompanies}
+            goalConfig={goalConfig}
+            onUpdateGoals={handleUpdateGoals}
+          />
+        )}
+        {tab === "strategy" && (
+          <StrategyTab lists={lists} companies={allCompanies} />
         )}
       </div>
 

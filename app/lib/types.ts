@@ -6,7 +6,7 @@ export type ResultType =
   | "担当NG"
   | "受付NG";
 
-export type Tab = "list" | "report" | "analytics" | "review";
+export type Tab = "list" | "report" | "review" | "progress" | "strategy";
 
 export type FormFieldType =
   | "none"
