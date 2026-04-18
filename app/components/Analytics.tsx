@@ -46,6 +46,7 @@ export default function Analytics({ lists, companies, goalConfig, onUpdateGoals 
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState("");
+  const [analysisMode, setAnalysisMode] = useState<"overall" | "list">("overall");
 
   const today = new Date().toISOString().split("T")[0];
   const thisMonth = today.substring(0, 7);
@@ -287,10 +288,10 @@ export default function Analytics({ lists, companies, goalConfig, onUpdateGoals 
 
       {/* ── AIリスト分析 ── */}
       <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-semibold text-slate-800">AIリスト分析</h2>
-            <p className="text-xs text-slate-400 mt-0.5">リストごとの継続・廃棄判断と次のSansan条件をAIが提案します</p>
+            <p className="text-xs text-slate-400 mt-0.5">コール結果からSansan絞り条件・次のアクションをAIが提案します</p>
           </div>
           <button
             onClick={runAnalysis}
@@ -308,8 +309,27 @@ export default function Analytics({ lists, companies, goalConfig, onUpdateGoals 
           </button>
         </div>
 
+        {/* モード切替タブ（分析結果があるときだけ表示） */}
+        {analysisResult && (
+          <div className="flex gap-1 bg-white/70 rounded-xl p-1 mb-4 w-fit">
+            {([["overall", "全体分析"], ["list", "リスト別分析"]] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setAnalysisMode(mode)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  analysisMode === mode
+                    ? "bg-violet-600 text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!analysisResult && !analyzing && (
-          <p className="text-xs text-slate-400 mt-3">
+          <p className="text-xs text-slate-400 mt-1">
             ※ コールを記録してから実行するほど精度が上がります
           </p>
         )}
@@ -319,16 +339,63 @@ export default function Analytics({ lists, companies, goalConfig, onUpdateGoals 
         )}
 
         {analysisResult && (
-          <div className="space-y-5 mt-4">
+          <div className="space-y-5">
 
-            {/* 全体診断 */}
-            <div className="bg-white rounded-xl p-4 border border-violet-100">
-              <div className="text-xs text-violet-500 font-semibold mb-1.5">全体診断</div>
-              <p className="text-sm text-slate-700 leading-relaxed">{analysisResult.overall_diagnosis}</p>
-            </div>
+            {/* ===== 全体分析モード ===== */}
+            {analysisMode === "overall" && (
+              <>
+                {/* 全体診断 */}
+                <div className="bg-white rounded-xl p-4 border border-violet-100">
+                  <div className="text-xs text-violet-500 font-semibold mb-1.5">全体診断</div>
+                  <p className="text-sm text-slate-700 leading-relaxed">{analysisResult.overall_diagnosis}</p>
+                </div>
 
-            {/* リスト別分析 */}
-            {analysisResult.list_analyses?.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 最もROIが高いリスト */}
+                  {analysisResult.best_list && (
+                    <div className="bg-white rounded-xl p-4 border border-emerald-100">
+                      <div className="text-xs text-emerald-600 font-semibold mb-2">最も効果的なリスト</div>
+                      <p className="text-sm font-semibold text-slate-800 mb-1">{analysisResult.best_list.name}</p>
+                      <p className="text-xs text-slate-500 mb-2">{analysisResult.best_list.reason}</p>
+                      <div className="bg-emerald-50 rounded-lg px-3 py-2 text-xs text-slate-700">
+                        <span className="text-emerald-600 font-semibold">横展開：</span> {analysisResult.best_list.replicate}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* NGパターン */}
+                  {analysisResult.ng_pattern_insight && (
+                    <div className="bg-white rounded-xl p-4 border border-slate-100">
+                      <div className="text-xs text-slate-500 font-semibold mb-2">NG理由から見えること</div>
+                      <p className="text-xs text-slate-600 leading-relaxed">{analysisResult.ng_pattern_insight}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 優先アクション */}
+                {analysisResult.priority_actions?.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-slate-100">
+                    <div className="text-xs text-slate-500 font-semibold mb-3">今週やるべきアクション</div>
+                    <div className="space-y-3">
+                      {analysisResult.priority_actions.map((item, i) => (
+                        <div key={i} className="flex gap-3 items-start">
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${priorityColor[item.priority] ?? "bg-slate-100 text-slate-500"}`}>
+                            {item.priority}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">{item.action}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{item.expected_impact}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ===== リスト別分析モード ===== */}
+            {analysisMode === "list" && analysisResult.list_analyses?.length > 0 && (
               <div>
                 <div className="text-xs text-slate-500 font-semibold mb-2">リスト別診断</div>
                 <div className="space-y-3">
@@ -386,48 +453,6 @@ export default function Analytics({ lists, companies, goalConfig, onUpdateGoals 
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* 最もROIが高いリスト */}
-              {analysisResult.best_list && (
-                <div className="bg-white rounded-xl p-4 border border-emerald-100">
-                  <div className="text-xs text-emerald-600 font-semibold mb-2">最も効果的なリスト</div>
-                  <p className="text-sm font-semibold text-slate-800 mb-1">{analysisResult.best_list.name}</p>
-                  <p className="text-xs text-slate-500 mb-2">{analysisResult.best_list.reason}</p>
-                  <div className="bg-emerald-50 rounded-lg px-3 py-2 text-xs text-slate-700">
-                    <span className="text-emerald-600 font-semibold">横展開：</span> {analysisResult.best_list.replicate}
-                  </div>
-                </div>
-              )}
-
-              {/* NGパターン */}
-              {analysisResult.ng_pattern_insight && (
-                <div className="bg-white rounded-xl p-4 border border-slate-100">
-                  <div className="text-xs text-slate-500 font-semibold mb-2">NG理由から見えること</div>
-                  <p className="text-xs text-slate-600 leading-relaxed">{analysisResult.ng_pattern_insight}</p>
-                </div>
-              )}
-            </div>
-
-            {/* 優先アクション */}
-            {analysisResult.priority_actions?.length > 0 && (
-              <div className="bg-white rounded-xl p-4 border border-slate-100">
-                <div className="text-xs text-slate-500 font-semibold mb-3">今週やるべきアクション</div>
-                <div className="space-y-3">
-                  {analysisResult.priority_actions.map((item, i) => (
-                    <div key={i} className="flex gap-3 items-start">
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${priorityColor[item.priority] ?? "bg-slate-100 text-slate-500"}`}>
-                        {item.priority}
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">{item.action}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{item.expected_impact}</p>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
