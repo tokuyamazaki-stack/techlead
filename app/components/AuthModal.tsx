@@ -30,7 +30,7 @@ export default function AuthModal({ onAuth }: Props) {
     } else {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) {
-        setError("登録に失敗しました。別のメールアドレスをお試しください");
+        setError(`登録に失敗しました：${error.message}`);
       } else {
         setDone(true);
       }
