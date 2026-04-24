@@ -123,7 +123,9 @@ export default function Home() {
         const updated = await db.getActiveCalls(workspace.id);
         setActiveCalls(updated);
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("[Realtime] status:", status, err ?? "");
+      });
 
     return () => {
       supabase.removeChannel(channel);
