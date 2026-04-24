@@ -167,12 +167,24 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   function logResult() {
     if (!selectedResult) return;
 
-    // 再コール・資料送付で次回連絡日が未入力なら自動で7日後をセット
+    // 次回連絡日が未入力なら結果に応じて自動セット
     let finalNextDate = nextDate;
-    if ((selectedResult === "再コール" || selectedResult === "資料送付") && !nextDate) {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      finalNextDate = d.toISOString().split("T")[0];
+    if (!nextDate) {
+      if (selectedResult === "再コール" || selectedResult === "資料送付") {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        finalNextDate = d.toISOString().split("T")[0];
+      } else if (selectedResult === "担当者不在") {
+        // 3営業日後（土日スキップ）
+        const d = new Date();
+        let added = 0;
+        while (added < 3) {
+          d.setDate(d.getDate() + 1);
+          const day = d.getDay(); // 0=日, 6=土
+          if (day !== 0 && day !== 6) added++;
+        }
+        finalNextDate = d.toISOString().split("T")[0];
+      }
     }
 
     const record: CallRecord = {
