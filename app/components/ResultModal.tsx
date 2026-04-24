@@ -6,7 +6,6 @@ import * as db from "../lib/db";
 import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS, NG_REASONS } from "../lib/types";
 import { today } from "../lib/parser";
 import { addBusinessDays } from "../lib/dateUtils";
-import MailModal from "./MailModal";
 
 interface Props {
   company: Company;
@@ -135,8 +134,6 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   const [ngReason, setNgReason] = useState("");
 
   const [saved, setSaved] = useState(false);
-  const [savedResult, setSavedResult] = useState<ResultType | null>(null);
-  const [showMailModal, setShowMailModal] = useState(false);
   const [tab, setTab] = useState<"call" | "info">("call");
 
   // リアルタイム架電状況の登録・解除
@@ -222,12 +219,8 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
     };
 
     onSave(updated);
-    setSavedResult(selectedResult);
     setSaved(true);
-    // アポ獲得・資料送付はメール送信ボタンを表示するため自動クローズしない
-    if (selectedResult !== "アポ獲得" && selectedResult !== "資料送付") {
-      setTimeout(() => onClose(), 700);
-    }
+    setTimeout(() => onClose(), 700);
   }
 
   function saveInfoOnly() {
@@ -329,14 +322,6 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
             <div className="text-center py-8">
               <div className="text-5xl mb-3">✓</div>
               <div className="text-slate-600 mb-5">記録しました</div>
-              {(savedResult === "アポ獲得" || savedResult === "資料送付") && (
-                <button
-                  onClick={() => setShowMailModal(true)}
-                  className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl py-3 text-sm font-semibold transition-all mb-3"
-                >
-                  ✉ メールを送る
-                </button>
-              )}
               <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
                 閉じる
               </button>
@@ -480,15 +465,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
                 {selectedResult ? `「${selectedResult}」を記録する` : "↑ 結果を選択してください"}
               </button>
 
-              {/* 既存のアポ・資料送付に対してもメール送信ボタンを表示 */}
-              {(company.latestResult === "アポ獲得" || company.latestResult === "資料送付") && (
-                <button
-                  onClick={() => { setSavedResult(company.latestResult); setShowMailModal(true); }}
-                  className="w-full mt-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl py-3 text-sm font-semibold transition-all"
-                >
-                  ✉ メールを送る（{company.latestResult}）
-                </button>
-              )}
+
             </>
           ) : (
             /* 担当者情報タブ */
@@ -608,15 +585,6 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
       </div>
     </div>
 
-    {/* メールテンプレートモーダル */}
-    {showMailModal && (savedResult === "アポ獲得" || savedResult === "資料送付") && (
-      <MailModal
-        company={company}
-        userSettings={userSettings}
-        templateType={savedResult}
-        onClose={() => setShowMailModal(false)}
-      />
-    )}
-    </>
+</>
   );
 }

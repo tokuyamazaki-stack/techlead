@@ -27,8 +27,6 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
   const [inviteCopied, setInviteCopied] = useState(false);
   const [calendarUrl, setCalendarUrl] = useState(current.calendarUrl);
   const [reportFormUrl, setReportFormUrl] = useState(current.reportFormUrl || "");
-  const [phone, setPhone] = useState(current.phone || "");
-  const [email, setEmail] = useState(current.email || "");
   const [formFields, setFormFields] = useState<ReportFormField[]>(current.reportFormFields ?? []);
 
   // トークスクリプト
@@ -51,8 +49,8 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
       name: name.trim(),
       calendarUrl: calendarUrl.trim(),
       reportFormUrl: reportFormUrl.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
+      phone: "",
+      email: "",
       reportFormFields: formFields,
       scripts,
       selectedScriptId,
@@ -263,31 +261,6 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
               </div>
             )}
           </div>
-
-          {/* 電話番号・メールアドレス */}
-          <div className="mb-5 grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">電話番号</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="例：070-4425-0729"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">メールアドレス</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="例：toku@randd-inc.com"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 -mt-3 mb-5">→ メールテンプレートの署名に自動入力されます</p>
 
           {/* 日報フォーム自動入力 */}
           <div className="mb-6 border border-slate-200 rounded-xl overflow-hidden">
