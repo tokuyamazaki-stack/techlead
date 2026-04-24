@@ -12,8 +12,6 @@ interface Props {
 
 export default function DailyReport({ companies, userSettings }: Props) {
   const reportFormUrl = userSettings.reportFormUrl;
-  const [reportMemo, setReportMemo] = useState("");
-  const [copied, setCopied] = useState(false);
   const t = today();
 
   // 今日コールした結果を全社から集計
@@ -49,46 +47,6 @@ export default function DailyReport({ companies, userSettings }: Props) {
   const totalCalls = todayRecords.length;
   const appo = resultCounts["アポ獲得"] || 0;
 
-  function generateText() {
-    const dateStr = new Date().toLocaleDateString("ja-JP", {
-      year: "numeric", month: "long", day: "numeric",
-    });
-
-    const resultLines = RESULTS.filter((r) => resultCounts[r] > 0)
-      .map((r) => `  ${r}：${resultCounts[r]}件`)
-      .join("\n");
-
-    const assigneeLines = Object.entries(byAssignee)
-      .map(([name, data]) => {
-        const detail = RESULTS.filter((r) => data.counts[r])
-          .map((r) => `${r}${data.counts[r]}`)
-          .join("・");
-        return `  ${name}：${data.total}件（${detail}）`;
-      })
-      .join("\n");
-
-    const companyLines = todayRecords
-      .filter((r) => r.result === "アポ獲得")
-      .map((r) => `  ・${r.companyName}`)
-      .join("\n");
-
-    return `【日報】${dateStr}
-
-■ コール結果
-総コール数：${totalCalls}件
-${resultLines}
-
-■ 担当者別
-${assigneeLines || "  データなし"}
-${companyLines ? `\n■ アポ獲得企業\n${companyLines}` : ""}
-${reportMemo ? `\n■ 所感・メモ\n${reportMemo}` : ""}`.trim();
-  }
-
-  function copyToClipboard() {
-    navigator.clipboard.writeText(generateText());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   function openReportForm() {
     if (!reportFormUrl) return;
@@ -247,27 +205,6 @@ ${reportMemo ? `\n■ 所感・メモ\n${reportMemo}` : ""}`.trim();
         </button>
       )}
 
-      {/* Memo + export */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <h3 className="text-sm font-semibold mb-3 text-slate-700">所感・メモ（任意）</h3>
-        <textarea
-          value={reportMemo}
-          onChange={(e) => setReportMemo(e.target.value)}
-          rows={3}
-          placeholder="今日の気づき、明日への改善点など..."
-          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-violet-500 transition-colors resize-none mb-4"
-        />
-        <button
-          onClick={copyToClipboard}
-          disabled={totalCalls === 0}
-          className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl py-3 text-sm font-semibold transition-all"
-        >
-          {copied ? "✓ コピーしました！" : "日報テキストをコピー"}
-        </button>
-        {totalCalls === 0 && (
-          <p className="text-xs text-slate-400 text-center mt-2">コールを記録すると日報が生成されます</p>
-        )}
-      </div>
     </div>
   );
 }
