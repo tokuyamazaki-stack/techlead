@@ -419,6 +419,56 @@ export default function Home() {
         )}
         {tab === "list" && (
           <>
+            {/* 今日のTODO */}
+            {followCount > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="text-sm font-bold text-slate-800">今日のTODO</span>
+                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold">{followCount}件</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {allCompanies
+                    .filter((c) => c.nextDate && c.nextDate <= today)
+                    .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
+                    .map((c) => {
+                      const isOverdue = c.nextDate < today;
+                      const list = lists.find((l) => l.companies.some((lc) => lc.id === c.id));
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            if (list) {
+                              setSelectedListId(list.id);
+                              setFilterResult("すべて");
+                              setSearch("");
+                              setTimeout(() => {
+                                const sorted = [...list.companies].sort((a, b) => {
+                                  const aT = a.nextDate === today ? -1 : 0;
+                                  const bT = b.nextDate === today ? -1 : 0;
+                                  return aT - bT;
+                                });
+                                const idx = sorted.findIndex((lc) => lc.id === c.id);
+                                if (idx !== -1) setSelectedIndex(idx);
+                              }, 50);
+                            }
+                          }}
+                          className="flex items-center gap-3 bg-white border border-slate-200 hover:border-violet-300 rounded-xl px-4 py-3 cursor-pointer transition-all group"
+                        >
+                          <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-lg ${isOverdue ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                            {isOverdue ? "期限超過" : "今日"}
+                          </span>
+                          <span className="font-medium text-slate-900 flex-1 min-w-0 truncate">{c.company}</span>
+                          <span className="text-xs text-slate-400 shrink-0 hidden sm:block">{c.nextDate}</span>
+                          {c.latestResult && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs shrink-0 hidden sm:block ${RESULT_CONFIG[c.latestResult].badge}`}>{c.latestResult}</span>
+                          )}
+                          <span className="text-xs text-violet-600 font-semibold shrink-0 group-hover:underline">コール →</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
             {lists.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 py-32 text-center bg-white">
                 <p className="text-slate-400 text-lg mb-2">リストがありません</p>
