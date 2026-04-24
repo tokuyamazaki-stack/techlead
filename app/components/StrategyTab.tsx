@@ -24,6 +24,16 @@ interface AnalysisResult {
   priority_actions: { priority: string; action: string; expected_impact: string }[];
 }
 
+interface ScriptStat {
+  name: string;
+  total: number;
+  appo: number;
+  material: number;
+  recall: number;
+  ng: number;
+  appoRate: number;
+}
+
 interface Props {
   lists: CallList[];
   companies: Company[];
@@ -39,6 +49,24 @@ export default function StrategyTab({ lists, companies }: Props) {
     companies.flatMap((c) => c.callHistory.map((h) => ({ ...h }))),
     [companies]
   );
+
+  const scriptStats = useMemo((): ScriptStat[] => {
+    const map = new Map<string, ScriptStat>();
+    for (const r of allRecords) {
+      const key = r.scriptName || "（スクリプト未使用）";
+      if (!map.has(key)) map.set(key, { name: key, total: 0, appo: 0, material: 0, recall: 0, ng: 0, appoRate: 0 });
+      const s = map.get(key)!;
+      s.total++;
+      if (r.result === "アポ獲得") s.appo++;
+      else if (r.result === "資料送付") s.material++;
+      else if (r.result === "再コール") s.recall++;
+      else if (r.result === "担当NG" || r.result === "受付NG") s.ng++;
+    }
+    for (const s of map.values()) {
+      s.appoRate = s.total > 0 ? parseFloat(((s.appo / s.total) * 100).toFixed(1)) : 0;
+    }
+    return [...map.values()].sort((a, b) => b.appoRate - a.appoRate);
+  }, [allRecords]);
 
   async function runAnalysis() {
     setAnalyzing(true);
@@ -225,6 +253,55 @@ export default function StrategyTab({ lists, companies }: Props) {
           <div className="text-xs text-red-500 bg-red-50 rounded-lg px-4 py-3 mt-3">{analysisError}</div>
         )}
       </div>
+
+      {/* スクリプト別アポ率 */}
+      {scriptStats.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60">
+            <h3 className="text-sm font-semibold text-slate-800">スクリプト別アポ率</h3>
+            <p className="text-xs text-slate-400 mt-0.5">コール記録に紐づいたスクリプト名で集計しています</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] text-slate-400 border-b border-slate-100">
+                  <th className="text-left px-5 py-2.5 font-semibold">スクリプト名</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">コール数</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">アポ</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">資料送付</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">再コール</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">NG</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">アポ率</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scriptStats.map((s, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-3 text-slate-700 font-medium text-xs">{s.name}</td>
+                    <td className="px-4 py-3 text-right text-slate-600 text-xs">{s.total}</td>
+                    <td className="px-4 py-3 text-right text-xs">
+                      <span className="text-emerald-600 font-semibold">{s.appo}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-purple-500 text-xs">{s.material}</td>
+                    <td className="px-4 py-3 text-right text-amber-500 text-xs">{s.recall}</td>
+                    <td className="px-4 py-3 text-right text-red-400 text-xs">{s.ng}</td>
+                    <td className="px-5 py-3 text-right">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        s.appoRate >= 10 ? "bg-emerald-100 text-emerald-700" :
+                        s.appoRate >= 5  ? "bg-blue-100 text-blue-700" :
+                        s.appoRate > 0   ? "bg-amber-100 text-amber-600" :
+                        "bg-slate-100 text-slate-400"
+                      }`}>
+                        {s.appoRate}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 分析結果 */}
       {analysisResult && (
