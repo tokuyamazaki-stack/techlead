@@ -6,7 +6,6 @@ import { RESULT_CONFIG, DEFAULT_TAGS, DEFAULT_GOALS } from "./lib/types";
 import ImportModal from "./components/ImportModal";
 import ResultModal from "./components/ResultModal";
 import SettingsModal from "./components/SettingsModal";
-import DailyReport from "./components/DailyReport";
 import ProgressTab from "./components/ProgressTab";
 import StrategyTab from "./components/StrategyTab";
 import FollowTab from "./components/FollowTab";
@@ -398,7 +397,6 @@ export default function Home() {
           {[
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
             { id: "follow" as Tab, label: `フォロー${followCount > 0 ? `(${followCount})` : ""}`, labelFull: `フォロー${followCount > 0 ? ` (${followCount})` : ""}` },
-            { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
             { id: "progress" as Tab, label: "進捗", labelFull: "進捗" },
             { id: "strategy" as Tab, label: "AI戦略", labelFull: "AI戦略" },
           ].map((t) => (
@@ -730,7 +728,6 @@ export default function Home() {
             }}
           />
         )}
-        {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
         {tab === "progress" && (
           <ProgressTab
             companies={allCompanies}
