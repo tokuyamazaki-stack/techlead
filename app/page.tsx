@@ -325,28 +325,49 @@ export default function Home() {
 
   const FILTER_OPTIONS = ["すべて", "未コール", "本日ネクスト", "アポ獲得", "資料送付", "再コール", "担当者不在", "担当NG", "受付NG"];
 
-  const filtered = useMemo(() => {
-    const companies = currentList?.companies ?? [];
-    return companies
+  // 全担当者一覧（現在のリスト）
+  const assigneeOptions = useMemo(() => {
+    const names = new Set<string>();
+    (currentList?.companies ?? []).forEach(c => { if (c.assignee) names.add(c.assignee); });
+    return [...names].sort();
+  }, [currentList]);
+
+  const [filterAssignee, setFilterAssignee] = useState<string>("すべて");
+
+  // 2文字以上で全リスト横断検索、それ以外は現在のリスト内フィルター
+  type FilteredCompany = Company & { _listName?: string };
+  const isGlobalSearch = search.trim().length >= 2;
+
+  const filtered = useMemo((): FilteredCompany[] => {
+    const q = search.trim();
+    const source: FilteredCompany[] = isGlobalSearch
+      ? lists.flatMap(l => l.companies.map(c => ({ ...c, _listName: l.name })))
+      : (currentList?.companies ?? []).map(c => ({ ...c }));
+
+    return source
       .filter((c) => {
         const matchFilter =
           filterResult === "すべて" ||
           (filterResult === "未コール" && !c.latestResult) ||
           (filterResult === "本日ネクスト" && c.nextDate === today) ||
           c.latestResult === filterResult;
+        const matchAssignee =
+          filterAssignee === "すべて" || c.assignee === filterAssignee;
         const matchSearch =
-          !search ||
-          c.company.includes(search) ||
-          (c.industry || "").includes(search) ||
-          (c.phone || "").includes(search);
-        return matchFilter && matchSearch;
+          !q ||
+          c.company.includes(q) ||
+          (c.industry || "").includes(q) ||
+          (c.phone || "").includes(q) ||
+          (c.contactName || "").includes(q) ||
+          (c.assignee || "").includes(q);
+        return matchFilter && matchAssignee && matchSearch;
       })
       .sort((a, b) => {
         const aToday = a.nextDate === today ? -1 : 0;
         const bToday = b.nextDate === today ? -1 : 0;
         return aToday - bToday;
       });
-  }, [currentList, filterResult, search, today]);
+  }, [lists, currentList, filterResult, filterAssignee, search, today, isGlobalSearch]);
 
   const selected = selectedIndex !== null ? filtered[selectedIndex] ?? null : null;
 
@@ -586,29 +607,61 @@ export default function Home() {
                     </div>
 
                     {/* Filter + Search */}
-                    <div className="flex items-center gap-3 mb-4 flex-wrap">
-                      <div className="flex gap-1.5 flex-wrap">
-                        {FILTER_OPTIONS.map((f) => (
-                          <button key={f} onClick={() => setFilterResult(f)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                              filterResult === f ? "bg-slate-800 text-white"
-                              : f === "本日ネクスト" && todayNextCount > 0 ? "bg-violet-100 text-violet-700 hover:bg-violet-200"
-                              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                            }`}>
-                            {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
+                    <div className="space-y-2 mb-4">
+                      {/* 検索欄 */}
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1 max-w-sm">
+                          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                          </svg>
+                          <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setSelectedIndex(null); }}
+                            placeholder="企業名・業種・担当者名で検索..."
+                            className="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-400 transition-all" />
+                          {search && (
+                            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
+                          )}
+                        </div>
+                        {isGlobalSearch && (
+                          <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-lg font-medium shrink-0">
+                            全リスト検索中 · {filtered.length}件
+                          </span>
+                        )}
+                        <div className="ml-auto">
+                          <button
+                            onClick={() => setAppendingToListId(currentList.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-lg text-xs transition-all"
+                          >
+                            ＋ 企業を追加
                           </button>
-                        ))}
+                        </div>
                       </div>
-                      <div className="ml-auto flex items-center gap-2">
-                        <button
-                          onClick={() => setAppendingToListId(currentList.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-lg text-xs transition-all"
-                        >
-                          ＋ 企業を追加
-                        </button>
-                        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                          placeholder="企業名・電話番号で検索..."
-                          className="bg-white border border-slate-200 rounded-lg px-4 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all w-56" />
+
+                      {/* フィルターバー */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex gap-1 flex-wrap">
+                          {FILTER_OPTIONS.map((f) => (
+                            <button key={f} onClick={() => setFilterResult(f)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                                filterResult === f ? "bg-slate-800 text-white"
+                                : f === "本日ネクスト" && todayNextCount > 0 ? "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                              }`}>
+                              {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
+                            </button>
+                          ))}
+                        </div>
+                        {assigneeOptions.length > 0 && (
+                          <select
+                            value={filterAssignee}
+                            onChange={(e) => setFilterAssignee(e.target.value)}
+                            className="ml-auto text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-600 focus:outline-none focus:border-violet-400 transition-all cursor-pointer"
+                          >
+                            <option value="すべて">担当：すべて</option>
+                            {assigneeOptions.map(a => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
 
@@ -652,7 +705,7 @@ export default function Home() {
                               <tr key={company.id} onClick={() => setSelectedIndex(i)}
                                 className={`cursor-pointer border-t transition-colors ${rowClass}`}>
                                 <td className="px-4 py-3.5">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     {isNextToday && !activeCall && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />}
                                     <span className="font-semibold text-slate-800">{company.company}</span>
                                     {isMyCall && (
@@ -660,6 +713,9 @@ export default function Home() {
                                     )}
                                     {otherColor && activeCall && (
                                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${otherColor.badge}`}>{activeCall.userName}</span>
+                                    )}
+                                    {isGlobalSearch && (company as FilteredCompany)._listName && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">{(company as FilteredCompany)._listName}</span>
                                     )}
                                   </div>
                                 </td>
