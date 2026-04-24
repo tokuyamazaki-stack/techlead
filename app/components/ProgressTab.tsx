@@ -4,8 +4,12 @@ import { useState, useMemo } from "react";
 import type { Company, GoalConfig } from "../lib/types";
 import { RESULTS, RESULT_CONFIG } from "../lib/types";
 import type { WorkingHoursRecord } from "../lib/db";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie,
+} from "recharts";
 
-type Period = "day" | "week" | "month";
+type Period = "day" | "week" | "month" | "custom";
 
 interface Props {
   companies: Company[];
@@ -27,18 +31,41 @@ function weekStartStr() {
 
 function fmt(n: number) { return n.toLocaleString(); }
 
-function KpiCard({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
+function KpiCard({ label, value, sub, highlight, icon }: {
+  label: string; value: string; sub?: string; highlight?: boolean; icon?: string;
+}) {
   return (
-    <div className={`rounded-xl p-4 border shadow-sm ${highlight ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-200"}`}>
+    <div className={`rounded-2xl p-5 border shadow-sm ${highlight ? "bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200" : "bg-white border-slate-200"}`}>
+      {icon && <div className="text-xl mb-2">{icon}</div>}
       <div className="text-xs text-slate-400 mb-1">{label}</div>
       <div className={`text-2xl font-bold ${highlight ? "text-emerald-600" : "text-slate-800"}`}>{value}</div>
-      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+      {sub && <div className={`text-xs mt-0.5 ${highlight ? "text-emerald-500 font-semibold" : "text-slate-400"}`}>{sub}</div>}
+    </div>
+  );
+}
+
+// Tooltip カスタマイズ
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { color: string; name: string; value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-xs">
+      <div className="text-slate-500 mb-1.5 font-semibold">{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full inline-block" style={{ background: p.color }} />
+          <span className="text-slate-600">{p.name}</span>
+          <span className="font-bold text-slate-900 ml-auto pl-3">{p.value}件</span>
+        </div>
+      ))}
     </div>
   );
 }
 
 export default function ProgressTab({ companies, goalConfig, onUpdateGoals, workingHours, onLogHours, currentUserName }: Props) {
   const [period, setPeriod] = useState<Period>("month");
+  const [customFrom, setCustomFrom] = useState(todayStr());
+  const [customTo, setCustomTo] = useState(todayStr());
+  const [searchQuery, setSearchQuery] = useState("");
   const [showHoursInput, setShowHoursInput] = useState(false);
   const [inputHours, setInputHours] = useState("");
   const [showGoalEditor, setShowGoalEditor] = useState(false);
@@ -56,20 +83,34 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
   const periodRecords = useMemo(() => {
     if (period === "day") return allRecords.filter(r => r.date === today);
     if (period === "week") return allRecords.filter(r => r.date >= weekStart && r.date <= today);
+    if (period === "custom") return allRecords.filter(r => customFrom && customTo && r.date >= customFrom && r.date <= customTo);
     return allRecords.filter(r => r.date.startsWith(thisMonth));
-  }, [allRecords, period, today, weekStart, thisMonth]);
+  }, [allRecords, period, today, weekStart, thisMonth, customFrom, customTo]);
 
   const periodHours = useMemo(() => {
     if (period === "day") return workingHours.filter(h => h.date === today);
     if (period === "week") return workingHours.filter(h => h.date >= weekStart && h.date <= today);
+    if (period === "custom") return workingHours.filter(h => customFrom && customTo && h.date >= customFrom && h.date <= customTo);
     return workingHours.filter(h => h.date.startsWith(thisMonth));
-  }, [workingHours, period, today, weekStart, thisMonth]);
+  }, [workingHours, period, today, weekStart, thisMonth, customFrom, customTo]);
+
+  const displayRecords = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return periodRecords;
+    return periodRecords.filter(r => r.assignee?.includes(q));
+  }, [periodRecords, searchQuery]);
+
+  const displayHours = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return periodHours;
+    return periodHours.filter(h => h.userName?.includes(q));
+  }, [periodHours, searchQuery]);
 
   const teamStats = useMemo(() => {
-    const calls = periodRecords.length;
-    const appo = periodRecords.filter(r => r.result === "アポ獲得").length;
-    const material = periodRecords.filter(r => r.result === "資料送付").length;
-    const totalHours = periodHours.reduce((sum, h) => sum + h.hours, 0);
+    const calls = displayRecords.length;
+    const appo = displayRecords.filter(r => r.result === "アポ獲得").length;
+    const material = displayRecords.filter(r => r.result === "資料送付").length;
+    const totalHours = displayHours.reduce((sum, h) => sum + h.hours, 0);
     return {
       calls, appo, material,
       totalHours: totalHours > 0 ? totalHours.toFixed(1) : "—",
@@ -77,15 +118,15 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
       appoRate: calls > 0 ? ((appo / calls) * 100).toFixed(1) : "0.0",
       materialRate: calls > 0 ? ((material / calls) * 100).toFixed(1) : "0.0",
     };
-  }, [periodRecords, periodHours]);
+  }, [displayRecords, displayHours]);
 
   const memberStats = useMemo(() => {
     const nameSet = new Set<string>();
-    periodRecords.forEach(r => { if (r.assignee) nameSet.add(r.assignee); });
-    periodHours.forEach(h => { if (h.userName) nameSet.add(h.userName); });
+    displayRecords.forEach(r => { if (r.assignee) nameSet.add(r.assignee); });
+    displayHours.forEach(h => { if (h.userName) nameSet.add(h.userName); });
     return [...nameSet].map(name => {
-      const recs = periodRecords.filter(r => r.assignee === name);
-      const hrs = periodHours.filter(h => h.userName === name).reduce((s, h) => s + h.hours, 0);
+      const recs = displayRecords.filter(r => r.assignee === name);
+      const hrs = displayHours.filter(h => h.userName === name).reduce((s, h) => s + h.hours, 0);
       const calls = recs.length;
       const appo = recs.filter(r => r.result === "アポ獲得").length;
       const material = recs.filter(r => r.result === "資料送付").length;
@@ -97,9 +138,54 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
         materialRate: calls > 0 ? ((material / calls) * 100).toFixed(1) : "0.0",
       };
     }).sort((a, b) => b.calls - a.calls);
-  }, [periodRecords, periodHours]);
+  }, [displayRecords, displayHours]);
 
-  // チャート用（期間によらず全件）
+  // 直近30日の折れ線グラフデータ
+  const trendData = useMemo(() => {
+    const days: string[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      days.push(d.toISOString().split("T")[0]);
+    }
+    return days.map(date => ({
+      date,
+      label: new Date(date + "T00:00:00").toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }),
+      コール: allRecords.filter(r => r.date === date).length,
+      アポ: allRecords.filter(r => r.date === date && r.result === "アポ獲得").length,
+      資料: allRecords.filter(r => r.date === date && r.result === "資料送付").length,
+    }));
+  }, [allRecords]);
+
+  // メンバー比較棒グラフ用
+  const memberBarData = memberStats.map(m => ({
+    name: m.name,
+    コール: m.calls,
+    アポ: m.appo,
+    資料: m.material,
+  }));
+
+  // 結果内訳パイチャート用
+  const resultCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    RESULTS.forEach(r => (counts[r] = 0));
+    allRecords.forEach(r => { counts[r.result] = (counts[r.result] || 0) + 1; });
+    return counts;
+  }, [allRecords]);
+
+  const pieData = RESULTS
+    .filter(r => resultCounts[r] > 0)
+    .map(r => ({ name: r, value: resultCounts[r] }));
+
+  const PIE_COLORS: Record<string, string> = {
+    アポ獲得: "#10b981",
+    資料送付: "#a78bfa",
+    再コール: "#f59e0b",
+    担当者不在: "#60a5fa",
+    担当NG: "#f87171",
+    受付NG: "#fb7185",
+  };
+
+  // 業界傾向
   const byIndustry = useMemo(() => {
     const map: Record<string, { total: number; appo: number }> = {};
     allRecords.forEach(r => {
@@ -108,33 +194,27 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
       map[ind].total++;
       if (r.result === "アポ獲得") map[ind].appo++;
     });
-    return Object.entries(map).sort((a, b) => b[1].appo - a[1].appo).slice(0, 8);
+    return Object.entries(map)
+      .sort((a, b) => b[1].appo - a[1].appo)
+      .slice(0, 8)
+      .map(([name, data]) => ({
+        name,
+        コール: data.total,
+        アポ: data.appo,
+        アポ率: data.total > 0 ? Math.round((data.appo / data.total) * 100) : 0,
+      }));
   }, [allRecords]);
 
-  const last7Days = useMemo(() => {
-    const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      days.push(d.toISOString().split("T")[0]);
-    }
-    return days.map(date => ({
-      date,
-      label: new Date(date + "T00:00:00").toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }),
-      total: allRecords.filter(r => r.date === date).length,
-      appo: allRecords.filter(r => r.date === date && r.result === "アポ獲得").length,
-    }));
-  }, [allRecords]);
-  const maxDay = Math.max(...last7Days.map(d => d.total), 1);
-
-  const resultCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    RESULTS.forEach(r => (counts[r] = 0));
-    allRecords.forEach(r => { counts[r.result] = (counts[r.result] || 0) + 1; });
-    return counts;
-  }, [allRecords]);
   const total = allRecords.length;
 
-  const PERIOD_LABELS: Record<Period, string> = { day: "今日", week: "今週", month: "今月" };
+  const PERIOD_LABELS: Record<Period, string> = { day: "今日", week: "今週", month: "今月", custom: "カスタム" };
+
+  function periodHeading() {
+    if (period === "custom" && customFrom && customTo) {
+      return customFrom === customTo ? customFrom : `${customFrom} 〜 ${customTo}`;
+    }
+    return PERIOD_LABELS[period];
+  }
 
   if (total === 0) {
     return (
@@ -148,55 +228,75 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
   return (
     <div className="space-y-8">
 
-      {/* ── 期間 + 稼働時間入力 ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {(["day", "week", "month"] as Period[]).map(p => (
-            <button key={p} onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                period === p ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}>
-              {PERIOD_LABELS[p]}
+      {/* ── 期間選択 + 検索 ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+            {(["day", "week", "month", "custom"] as Period[]).map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  period === p ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}>
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {showHoursInput ? (
+              <div className="flex items-center gap-2 bg-white border border-violet-300 rounded-xl px-3 py-2 shadow-sm">
+                <span className="text-xs text-slate-500 shrink-0">今日の稼働時間</span>
+                <input type="number" min={0} max={24} step={0.5} value={inputHours}
+                  onChange={e => setInputHours(e.target.value)} placeholder="例: 4.5" autoFocus
+                  className="w-20 text-sm font-semibold text-slate-800 focus:outline-none" />
+                <span className="text-xs text-slate-400">時間</span>
+                <button onClick={() => {
+                  const h = parseFloat(inputHours);
+                  if (!isNaN(h) && h > 0) onLogHours(h);
+                  setInputHours(""); setShowHoursInput(false);
+                }} className="text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 px-2.5 py-1 rounded-lg transition-all">保存</button>
+                <button onClick={() => setShowHoursInput(false)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowHoursInput(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-xl text-xs font-medium transition-all">
+                ＋ 稼働時間を記録
+                {currentUserName && <span className="text-slate-300">({currentUserName})</span>}
+              </button>
+            )}
+            <button onClick={() => { setEditGoals(goalConfig); setShowGoalEditor(!showGoalEditor); }}
+              className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-500 rounded-xl text-xs transition-all">
+              目標設定
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {showHoursInput ? (
-            <div className="flex items-center gap-2 bg-white border border-violet-300 rounded-xl px-3 py-2 shadow-sm">
-              <span className="text-xs text-slate-500 shrink-0">今日の稼働時間</span>
-              <input
-                type="number" min={0} max={24} step={0.5}
-                value={inputHours}
-                onChange={e => setInputHours(e.target.value)}
-                placeholder="例: 4.5"
-                className="w-20 text-sm font-semibold text-slate-800 focus:outline-none"
-                autoFocus
-              />
-              <span className="text-xs text-slate-400">時間</span>
-              <button
-                onClick={() => {
-                  const h = parseFloat(inputHours);
-                  if (!isNaN(h) && h > 0) { onLogHours(h); }
-                  setInputHours(""); setShowHoursInput(false);
-                }}
-                className="text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 px-2.5 py-1 rounded-lg transition-all"
-              >保存</button>
-              <button onClick={() => setShowHoursInput(false)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+        {period === "custom" && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-xl px-3 py-2 shadow-sm">
+              <span className="text-xs text-slate-500 shrink-0">開始日</span>
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="text-sm text-slate-800 focus:outline-none bg-transparent" />
             </div>
-          ) : (
-            <button
-              onClick={() => setShowHoursInput(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-xl text-xs font-medium transition-all"
-            >
-              ＋ 稼働時間を記録
-              {currentUserName && <span className="text-slate-300">({currentUserName})</span>}
-            </button>
+            <span className="text-slate-400 text-sm">〜</span>
+            <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-xl px-3 py-2 shadow-sm">
+              <span className="text-xs text-slate-500 shrink-0">終了日</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="text-sm text-slate-800 focus:outline-none bg-transparent" />
+            </div>
+          </div>
+        )}
+
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder="担当者名で絞り込む..."
+            className="w-full pl-9 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-400 transition-colors" />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-base">✕</button>
           )}
-          <button
-            onClick={() => { setEditGoals(goalConfig); setShowGoalEditor(!showGoalEditor); }}
-            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-500 rounded-xl text-xs transition-all"
-          >目標設定</button>
         </div>
       </div>
 
@@ -217,8 +317,7 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
               <div key={key}>
                 <label className="text-xs text-slate-500 mb-1.5 block">{label}</label>
                 <div className="flex items-center gap-2">
-                  <input type="number" min={1}
-                    value={editGoals[key as keyof GoalConfig]}
+                  <input type="number" min={1} value={editGoals[key as keyof GoalConfig]}
                     onChange={e => setEditGoals({ ...editGoals, [key]: parseInt(e.target.value) || 1 })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500" />
                   <span className="text-sm text-slate-400 shrink-0">件</span>
@@ -226,33 +325,93 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
               </div>
             ))}
           </div>
-          <button
-            onClick={() => { onUpdateGoals(editGoals); setShowGoalEditor(false); }}
-            className="mt-4 w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-all"
-          >保存する</button>
+          <button onClick={() => { onUpdateGoals(editGoals); setShowGoalEditor(false); }}
+            className="mt-4 w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-all">
+            保存する
+          </button>
         </div>
       )}
 
-      {/* ── チーム KPI ── */}
+      {/* ── KPI カード ── */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          チーム — {PERIOD_LABELS[period]}
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+            {searchQuery.trim() ? `「${searchQuery.trim()}」` : "チーム"} — {periodHeading()}
+          </h2>
+          {displayRecords.length === 0 && (
+            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">データなし</span>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <KpiCard label="稼働時間" value={`${teamStats.totalHours}h`} />
-          <KpiCard label="コール数" value={`${fmt(teamStats.calls)}件`} />
-          <KpiCard label="コール / 時間" value={`${teamStats.callsPerHour}件`} sub="1時間あたり" />
-          <KpiCard label="資料送付" value={`${fmt(teamStats.material)}件`} sub={`${teamStats.materialRate}%`} />
-          <KpiCard label="アポ獲得" value={`${fmt(teamStats.appo)}件`} sub={`${teamStats.appoRate}%`} highlight={teamStats.appo > 0} />
+          <KpiCard label="稼働時間" value={`${teamStats.totalHours}h`} icon="⏱" />
+          <KpiCard label="コール数" value={`${fmt(teamStats.calls)}件`} icon="📞" />
+          <KpiCard label="コール / 時間" value={`${teamStats.callsPerHour}件`} sub="1時間あたり" icon="⚡" />
+          <KpiCard label="資料送付" value={`${fmt(teamStats.material)}件`} sub={`${teamStats.materialRate}%`} icon="📄" />
+          <KpiCard label="アポ獲得" value={`${fmt(teamStats.appo)}件`} sub={`${teamStats.appoRate}%`} highlight={teamStats.appo > 0} icon="🎯" />
         </div>
       </div>
 
-      {/* ── メンバー別 ── */}
+      {/* ── 直近30日 折れ線グラフ ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-5">直近30日のトレンド</h2>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tickLine={false}
+              interval={6}
+              axisLine={{ stroke: "#e2e8f0" }}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tickLine={false}
+              axisLine={false}
+              allowDecimals={false}
+            />
+            <Tooltip content={<ChartTooltip />} />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: "12px", paddingTop: "12px" }}
+            />
+            <Line type="monotone" dataKey="コール" stroke="#8b5cf6" strokeWidth={2}
+              dot={false} activeDot={{ r: 4, fill: "#8b5cf6" }} />
+            <Line type="monotone" dataKey="アポ" stroke="#10b981" strokeWidth={2.5}
+              dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
+            <Line type="monotone" dataKey="資料" stroke="#a78bfa" strokeWidth={1.5}
+              dot={false} strokeDasharray="4 2" activeDot={{ r: 4, fill: "#a78bfa" }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── メンバー比較 棒グラフ + テーブル ── */}
       {memberStats.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            メンバー別 — {PERIOD_LABELS[period]}
+            メンバー別 — {periodHeading()}
           </h2>
+
+          {/* 棒グラフ */}
+          {memberStats.length > 1 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={memberBarData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "12px" }} />
+                  <Bar dataKey="コール" fill="#c4b5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="アポ" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="資料" fill="#a78bfa" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* テーブル */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
@@ -275,6 +434,7 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
                             {m.name[0]}
                           </span>
                           <span className="text-sm font-semibold text-slate-800">{m.name}</span>
+                          {i === 0 && <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-semibold">TOP</span>}
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-right text-xs text-slate-500">{m.hours !== "—" ? `${m.hours}h` : "—"}</td>
@@ -288,8 +448,7 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
                         <span className={`text-sm font-bold ${m.appo > 0 ? "text-emerald-600" : "text-slate-300"}`}>{fmt(m.appo)}件</span>
                         <span className={`text-xs ml-1 font-semibold px-1.5 py-0.5 rounded-full ${
                           parseFloat(m.appoRate) >= 3 ? "bg-emerald-100 text-emerald-700" :
-                          parseFloat(m.appoRate) > 0 ? "bg-amber-100 text-amber-600" :
-                          "text-slate-300"
+                          parseFloat(m.appoRate) > 0 ? "bg-amber-100 text-amber-600" : "text-slate-300"
                         }`}>
                           {m.appo > 0 ? `${m.appoRate}%` : ""}
                         </span>
@@ -303,93 +462,61 @@ export default function ProgressTab({ companies, goalConfig, onUpdateGoals, work
         </div>
       )}
 
-      {/* ── 業界傾向 ── */}
-      {byIndustry.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">業界傾向（全期間）</h2>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-            {byIndustry.map(([ind, data], i) => {
-              const appoRate = data.total > 0 ? (data.appo / data.total) * 100 : 0;
-              const maxTotal = byIndustry[0][1].total;
-              return (
-                <div key={ind}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-300 w-4">{i + 1}</span>
-                      <span className="text-sm text-slate-700 font-medium">{ind}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="text-slate-400">{data.total}件</span>
-                      {data.appo > 0 && <span className="text-emerald-600 font-semibold">アポ {data.appo}件</span>}
-                      <span className={`font-bold w-9 text-right ${appoRate >= 10 ? "text-emerald-600" : appoRate >= 5 ? "text-amber-600" : "text-slate-400"}`}>
-                        {Math.round(appoRate)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-full" style={{ width: `${(data.total / maxTotal) * 100}%` }} />
-                    {data.appo > 0 && <div className="absolute inset-y-0 left-0 bg-emerald-500 rounded-full" style={{ width: `${(data.appo / maxTotal) * 100}%` }} />}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* ── 結果内訳 + 業界傾向 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      {/* ── 直近7日トレンド ── */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">直近7日のトレンド</h2>
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-end gap-3" style={{ height: "120px" }}>
-            {last7Days.map(d => {
-              const barH = maxDay > 0 ? Math.max((d.total / maxDay) * 88, d.total > 0 ? 8 : 0) : 0;
-              const appoH = d.total > 0 ? (d.appo / d.total) * barH : 0;
-              return (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-xs text-slate-400 h-4 flex items-center">{d.total || ""}</span>
-                  <div className="w-full flex flex-col justify-end rounded-t-md overflow-hidden" style={{ height: "88px" }}>
-                    {d.total > 0 ? (
-                      <>
-                        <div className="w-full bg-violet-400 rounded-t-md" style={{ height: `${barH - appoH}px` }} />
-                        {appoH > 0 && <div className="w-full bg-emerald-500" style={{ height: `${appoH}px` }} />}
-                      </>
-                    ) : (
-                      <div className="w-full bg-slate-100 rounded-t-md" style={{ height: "4px" }} />
-                    )}
+        {/* ドーナツチャート：結果内訳 */}
+        {total > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
+              全期間 結果内訳 <span className="text-slate-300 font-normal">計{total}件</span>
+            </h2>
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width={140} height={140}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={38} outerRadius={62}
+                    dataKey="value" paddingAngle={2}>
+                    {pieData.map((entry, i) => (
+                      <Cell key={i} fill={PIE_COLORS[entry.name] ?? "#cbd5e1"} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => [`${v}件`, ""]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-2">
+                {pieData.map(entry => (
+                  <div key={entry.name} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[entry.name] ?? "#cbd5e1" }} />
+                    <span className="text-xs text-slate-600 flex-1">{entry.name}</span>
+                    <span className="text-xs font-bold text-slate-800">{entry.value}</span>
+                    <span className="text-xs text-slate-400 w-9 text-right">
+                      {Math.round((entry.value / total) * 100)}%
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400">{d.label}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex gap-4 mt-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-violet-400 inline-block" />コール</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-full bg-emerald-500 inline-block" />アポ</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 全期間 結果内訳 ── */}
-      {total > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            全期間 結果内訳 <span className="text-slate-300 font-normal ml-1">計{total}件</span>
-          </h2>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
-            {RESULTS.filter(r => resultCounts[r] > 0).map(r => (
-              <div key={r} className="flex items-center gap-3">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-24 text-center shrink-0 ${RESULT_CONFIG[r].badge}`}>{r}</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div className={`h-full rounded-full ${RESULT_CONFIG[r].darkBg}`} style={{ width: `${(resultCounts[r] / total) * 100}%` }} />
-                </div>
-                <span className="text-sm font-bold text-slate-800 w-8 text-right">{resultCounts[r]}</span>
-                <span className="text-xs text-slate-400 w-10">{Math.round((resultCounts[r] / total) * 100)}%</span>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* 業界傾向 横棒グラフ */}
+        {byIndustry.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">業界別 アポ率（全期間）</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={byIndustry} layout="vertical" margin={{ top: 0, right: 40, left: 4, bottom: 0 }} barSize={10}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={80}
+                  tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value, name) => [name === "アポ率" ? `${value}%` : `${value}件`, name]} />
+                <Bar dataKey="コール" fill="#e2e8f0" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="アポ" fill="#10b981" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
 
     </div>
   );
