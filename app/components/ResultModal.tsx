@@ -190,9 +190,9 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
     // 次回連絡日が未入力なら結果に応じて自動セット（土日祝スキップ）
     let finalNextDate = nextDate;
     if (!nextDate) {
-      if (selectedResult === "再コール" || selectedResult === "資料送付") {
+      if (selectedResult === "資料送付") {
         finalNextDate = addBusinessDays(7);
-      } else if (selectedResult === "担当者不在") {
+      } else if (selectedResult === "再コール" || selectedResult === "担当者不在") {
         finalNextDate = addBusinessDays(3);
       }
     }

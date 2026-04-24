@@ -9,6 +9,7 @@ import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import ProgressTab from "./components/ProgressTab";
 import StrategyTab from "./components/StrategyTab";
+import FollowTab from "./components/FollowTab";
 import AuthModal from "./components/AuthModal";
 import WorkspaceSetup from "./components/WorkspaceSetup";
 import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
@@ -356,6 +357,11 @@ export default function Home() {
   const todayNextCount = currentList?.companies.filter((c) => c.nextDate === today).length ?? 0;
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
 
+  const followCount = allCompanies.filter((c) =>
+    c.latestResult && ["資料送付", "再コール", "担当者不在"].includes(c.latestResult) &&
+    (!c.nextDate || c.nextDate <= today)
+  ).length;
+
   // 認証チェック中
   if (!authChecked) return null;
 
@@ -391,6 +397,7 @@ export default function Home() {
         <div className="flex gap-0.5 md:gap-1 bg-slate-100 rounded-xl p-1">
           {[
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
+            { id: "follow" as Tab, label: `フォロー${followCount > 0 ? `(${followCount})` : ""}`, labelFull: `フォロー${followCount > 0 ? ` (${followCount})` : ""}` },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
             { id: "progress" as Tab, label: "進捗", labelFull: "進捗" },
             { id: "strategy" as Tab, label: "AI戦略", labelFull: "AI戦略" },
@@ -711,6 +718,18 @@ export default function Home() {
           </>
         )}
 
+        {tab === "follow" && (
+          <FollowTab
+            lists={lists}
+            today={today}
+            onOpen={(company, list) => {
+              setSelectedListId(list.id);
+              const idx = list.companies.findIndex((c) => c.id === company.id);
+              setSelectedIndex(idx >= 0 ? idx : null);
+              setTab("list");
+            }}
+          />
+        )}
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
         {tab === "progress" && (
           <ProgressTab
