@@ -17,7 +17,7 @@ import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
 import type { ReportFormField } from "./lib/types";
 import { supabase } from "./lib/supabase";
 import * as db from "./lib/db";
-import type { Workspace, WorkspaceMember } from "./lib/db";
+import type { Workspace, WorkspaceMember, ActiveCallInfo } from "./lib/db";
 import type { User } from "@supabase/supabase-js";
 
 // フォームURLのIDをキーに、既知の項目マッピングを定義
@@ -68,6 +68,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [filterResult, setFilterResult] = useState<string>("すべて");
   const [loading, setLoading] = useState(false);
+  const [activeCalls, setActiveCalls] = useState<ActiveCallInfo[]>([]);
 
   // 認証状態の監視
   useEffect(() => {
@@ -93,6 +94,9 @@ export default function Home() {
   useEffect(() => {
     if (!workspace || !user) return;
 
+    // 架電状況の初期取得
+    db.getActiveCalls(workspace.id).then(setActiveCalls);
+
     const channel = supabase
       .channel(`workspace-${workspace.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "call_records" }, async () => {
@@ -106,6 +110,10 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "call_lists" }, async () => {
         const updated = await db.loadAllLists(workspace.id);
         if (updated.length > 0) setLists(updated);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "active_calls" }, async () => {
+        const updated = await db.getActiveCalls(workspace.id);
+        setActiveCalls(updated);
       })
       .subscribe();
 
@@ -419,6 +427,56 @@ export default function Home() {
         )}
         {tab === "list" && (
           <>
+            {/* チーム架電状況（リアルタイム） */}
+            {members.length > 1 && (
+              <div className="mb-5 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-sm font-semibold text-slate-800">チーム架電状況</span>
+                  <span className="text-xs text-slate-400 ml-1">リアルタイム</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[11px] text-slate-400 border-b border-slate-100">
+                        <th className="text-left px-5 py-2 font-semibold">担当者</th>
+                        <th className="text-left px-4 py-2 font-semibold">状態</th>
+                        <th className="text-left px-4 py-2 font-semibold">コール先</th>
+                        <th className="text-left px-5 py-2 font-semibold">開始時刻</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((m) => {
+                        const active = activeCalls.find((a) => a.userId === m.userId);
+                        return (
+                          <tr key={m.userId} className="border-b border-slate-50 last:border-0">
+                            <td className="px-5 py-3 text-xs font-medium text-slate-700">{m.name || m.email}</td>
+                            <td className="px-4 py-3">
+                              {active ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  コール中
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">待機中</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-600">
+                              {active ? active.companyName : <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className="px-5 py-3 text-xs text-slate-400">
+                              {active
+                                ? new Date(active.startedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+                                : <span className="text-slate-300">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {/* 今日のTODO */}
             {followCount > 0 && (
               <div className="mb-5">
@@ -737,6 +795,8 @@ export default function Home() {
           hasNext={selectedIndex < filtered.length - 1}
           onPrev={() => setSelectedIndex(selectedIndex - 1)}
           onNext={() => setSelectedIndex(selectedIndex + 1)}
+          workspaceId={workspace?.id}
+          userId={user?.id}
         />
       )}
     </div>

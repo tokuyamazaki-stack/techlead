@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Company, ResultType, CallRecord, TagConfig, UserSettings } from "../lib/types";
+import * as db from "../lib/db";
 import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS, NG_REASONS } from "../lib/types";
 import { today } from "../lib/parser";
 import { addBusinessDays } from "../lib/dateUtils";
@@ -20,6 +21,9 @@ interface Props {
   hasNext?: boolean;
   onPrev?: () => void;
   onNext?: () => void;
+  // リアルタイム架電状況用
+  workspaceId?: string;
+  userId?: string;
 }
 
 // タグ選択 + 追加・削除できるコンポーネント
@@ -107,7 +111,7 @@ function TagSelector({
   );
 }
 
-export default function ResultModal({ company, tagConfig, userSettings, onSave, onUpdateTags, onClose, currentIndex, totalCount, hasPrev, hasNext, onPrev, onNext }: Props) {
+export default function ResultModal({ company, tagConfig, userSettings, onSave, onUpdateTags, onClose, currentIndex, totalCount, hasPrev, hasNext, onPrev, onNext, workspaceId, userId }: Props) {
   const [selectedResult, setSelectedResult] = useState<ResultType | null>(company.latestResult ?? null);
   const [memo, setMemo] = useState("");
   const [assignee, setAssignee] = useState(company.assignee || userSettings.name || "");
@@ -134,6 +138,18 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   const [savedResult, setSavedResult] = useState<ResultType | null>(null);
   const [showMailModal, setShowMailModal] = useState(false);
   const [tab, setTab] = useState<"call" | "info">("call");
+
+  // リアルタイム架電状況の登録・解除
+  useEffect(() => {
+    if (!workspaceId || !userId) return;
+    const userName = userSettings.name || "不明";
+    db.setActiveCall(workspaceId, userId, userName, company.id, company.company);
+    return () => {
+      db.clearActiveCall(workspaceId, userId);
+    };
+  // company.idが変わったとき（前後ナビ）も再登録する
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, userId, company.id]);
 
   // スワイプ検知
   const touchStartX = useRef<number | null>(null);

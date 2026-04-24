@@ -340,3 +340,57 @@ export async function saveCompany(userId: string, listId: string, company: Compa
     });
   }
 }
+
+// ============================================================
+// リアルタイム架電状況
+// ============================================================
+
+export interface ActiveCallInfo {
+  userId: string;
+  userName: string;
+  companyId: string;
+  companyName: string;
+  startedAt: string;
+}
+
+export async function setActiveCall(
+  workspaceId: string,
+  userId: string,
+  userName: string,
+  companyId: string,
+  companyName: string,
+) {
+  await supabase.from("active_calls").upsert(
+    {
+      workspace_id: workspaceId,
+      user_id: userId,
+      user_name: userName,
+      company_id: companyId,
+      company_name: companyName,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "workspace_id,user_id" },
+  );
+}
+
+export async function clearActiveCall(workspaceId: string, userId: string) {
+  await supabase
+    .from("active_calls")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+}
+
+export async function getActiveCalls(workspaceId: string): Promise<ActiveCallInfo[]> {
+  const { data } = await supabase
+    .from("active_calls")
+    .select("*")
+    .eq("workspace_id", workspaceId);
+  return (data || []).map((r) => ({
+    userId: r.user_id,
+    userName: r.user_name,
+    companyId: r.company_id,
+    companyName: r.company_name,
+    startedAt: r.started_at,
+  }));
+}
