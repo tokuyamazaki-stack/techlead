@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UserSettings, ReportFormField, FormFieldType } from "../lib/types";
+import type { UserSettings, ReportFormField, FormFieldType, TalkScript } from "../lib/types";
 import { FORM_FIELD_LABELS } from "../lib/types";
 import type { Workspace, WorkspaceMember } from "../lib/db";
 import * as db from "../lib/db";
@@ -31,6 +31,15 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
   const [email, setEmail] = useState(current.email || "");
   const [formFields, setFormFields] = useState<ReportFormField[]>(current.reportFormFields ?? []);
 
+  // トークスクリプト
+  const [scripts, setScripts] = useState<TalkScript[]>(current.scripts ?? []);
+  const [selectedScriptId, setSelectedScriptId] = useState(current.selectedScriptId ?? "");
+  const [showScriptSetup, setShowScriptSetup] = useState(false);
+  const [editingScript, setEditingScript] = useState<TalkScript | null>(null);
+  const [newScriptName, setNewScriptName] = useState("");
+  const [newScriptContent, setNewScriptContent] = useState("");
+  const [addingScript, setAddingScript] = useState(false);
+
   // フォーム自動入力設定
   const [showFormSetup, setShowFormSetup] = useState(false);
   const [prefillUrl, setPrefillUrl] = useState("");
@@ -45,8 +54,33 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
       phone: phone.trim(),
       email: email.trim(),
       reportFormFields: formFields,
+      scripts,
+      selectedScriptId,
     });
     onClose();
+  }
+
+  function addScript() {
+    if (!newScriptName.trim()) return;
+    const s: TalkScript = { id: `script-${Date.now()}`, name: newScriptName.trim(), content: newScriptContent };
+    const next = [...scripts, s];
+    setScripts(next);
+    if (!selectedScriptId) setSelectedScriptId(s.id);
+    setNewScriptName("");
+    setNewScriptContent("");
+    setAddingScript(false);
+  }
+
+  function saveEditingScript() {
+    if (!editingScript) return;
+    setScripts(scripts.map((s) => s.id === editingScript.id ? editingScript : s));
+    setEditingScript(null);
+  }
+
+  function deleteScript(id: string) {
+    const next = scripts.filter((s) => s.id !== id);
+    setScripts(next);
+    if (selectedScriptId === id) setSelectedScriptId(next[0]?.id ?? "");
   }
 
   // 事前入力URLを解析してentry IDを抽出
@@ -126,6 +160,108 @@ export default function SettingsModal({ current, onSave, onClose, onResetDemo, w
               <p>③ 共有リンクをコピーしてここに貼る</p>
               <p className="text-violet-600 mt-1">→ アポ獲得時にこのカレンダーが表示されます</p>
             </div>
+          </div>
+
+          {/* トークスクリプト */}
+          <div className="mb-6 border border-slate-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowScriptSetup(!showScriptSetup)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+            >
+              <div>
+                <span className="text-sm font-medium text-slate-700">トークスクリプト</span>
+                {scripts.length > 0 && (
+                  <span className="ml-2 text-xs text-emerald-600 font-medium">{scripts.length}件登録済み</span>
+                )}
+              </div>
+              <span className="text-slate-400 text-sm">{showScriptSetup ? "▲" : "▼"}</span>
+            </button>
+
+            {showScriptSetup && (
+              <div className="px-4 py-4 space-y-3">
+                {/* スクリプト一覧 */}
+                {scripts.map((s) => (
+                  <div key={s.id} className={`border rounded-xl overflow-hidden transition-all ${selectedScriptId === s.id ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white"}`}>
+                    {editingScript?.id === s.id ? (
+                      <div className="p-3 space-y-2">
+                        <input
+                          value={editingScript.name}
+                          onChange={(e) => setEditingScript({ ...editingScript, name: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-violet-500"
+                          placeholder="スクリプト名"
+                        />
+                        <textarea
+                          value={editingScript.content}
+                          onChange={(e) => setEditingScript({ ...editingScript, content: e.target.value })}
+                          rows={6}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-violet-500 resize-none"
+                          placeholder="スクリプト本文..."
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={saveEditingScript} className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-all">保存</button>
+                          <button onClick={() => setEditingScript(null)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs rounded-lg transition-all">キャンセル</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="selectedScript"
+                              checked={selectedScriptId === s.id}
+                              onChange={() => setSelectedScriptId(s.id)}
+                              className="accent-violet-600"
+                            />
+                            <span className="text-sm font-medium text-slate-800">{s.name}</span>
+                            {selectedScriptId === s.id && <span className="text-[10px] bg-violet-600 text-white px-1.5 py-0.5 rounded-full">使用中</span>}
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => setEditingScript(s)} className="text-xs text-slate-400 hover:text-violet-600 px-2 py-1 rounded transition-colors">編集</button>
+                            <button onClick={() => deleteScript(s.id)} className="text-xs text-slate-400 hover:text-red-500 px-2 py-1 rounded transition-colors">削除</button>
+                          </div>
+                        </div>
+                        {s.content && (
+                          <p className="text-xs text-slate-400 ml-5 truncate">{s.content.slice(0, 60)}{s.content.length > 60 ? "…" : ""}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* 新規追加フォーム */}
+                {addingScript ? (
+                  <div className="border border-violet-200 rounded-xl p-3 space-y-2 bg-violet-50">
+                    <input
+                      autoFocus
+                      value={newScriptName}
+                      onChange={(e) => setNewScriptName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-violet-500"
+                      placeholder="スクリプト名（例：新規開拓用）"
+                    />
+                    <textarea
+                      value={newScriptContent}
+                      onChange={(e) => setNewScriptContent(e.target.value)}
+                      rows={6}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-violet-500 resize-none"
+                      placeholder="スクリプト本文を入力..."
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={addScript} disabled={!newScriptName.trim()} className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-30 text-white text-xs font-semibold rounded-lg transition-all">追加</button>
+                      <button onClick={() => { setAddingScript(false); setNewScriptName(""); setNewScriptContent(""); }} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs rounded-lg transition-all">キャンセル</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAddingScript(true)}
+                    className="w-full py-2.5 rounded-xl text-xs border border-dashed border-slate-300 text-slate-500 hover:border-violet-400 hover:text-violet-600 transition-all"
+                  >
+                    ＋ スクリプトを追加
+                  </button>
+                )}
+                <p className="text-xs text-slate-400">→「保存する」を押すと設定が反映されます</p>
+              </div>
+            )}
           </div>
 
           {/* 電話番号・メールアドレス */}

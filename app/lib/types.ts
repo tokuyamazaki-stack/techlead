@@ -38,6 +38,12 @@ export interface ReportFormField {
   dataType: FormFieldType;
 }
 
+export interface TalkScript {
+  id: string;
+  name: string;    // スクリプト名（例：「新規開拓用」「フォロー用」）
+  content: string; // スクリプト本文
+}
+
 export interface UserSettings {
   name: string;
   calendarUrl: string;
@@ -45,6 +51,8 @@ export interface UserSettings {
   phone: string;   // 電話番号（メール署名用）
   email: string;   // メールアドレス（メール署名用）
   reportFormFields?: ReportFormField[];  // 日報フォーム自動入力マッピング
+  scripts?: TalkScript[];               // トークスクリプト一覧
+  selectedScriptId?: string;            // 現在使用中のスクリプトID
 }
 
 export interface CallList {
@@ -70,6 +78,7 @@ export interface CallRecord {
   challenges: string[];  // 相手の課題
   interests: string[];   // 興味を持ったポイント
   ngReason?: string;     // NG理由（担当NG・受付NGのみ）
+  scriptName?: string;   // 使用したトークスクリプト名
 }
 
 // NG理由のプリセット

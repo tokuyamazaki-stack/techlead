@@ -112,7 +112,10 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   const [memo, setMemo] = useState("");
   const [assignee, setAssignee] = useState(company.assignee || userSettings.name || "");
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showScript, setShowScript] = useState(false);
   const [nextDate, setNextDate] = useState(company.nextDate || "");
+
+  const activeScript = userSettings.scripts?.find((s) => s.id === userSettings.selectedScriptId) ?? null;
 
   // 担当者情報
   const [contactName, setContactName] = useState(company.contactName || "");
@@ -188,6 +191,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
       challenges: selectedChallenges,
       interests: selectedInterests,
       ...(ngReason.trim() && { ngReason: ngReason.trim() }),
+      ...(activeScript && { scriptName: activeScript.name }),
     };
 
     const updated: Company = {
@@ -231,7 +235,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
     >
       <div
         className={`bg-white border border-slate-200 rounded-2xl w-full shadow-2xl overflow-hidden max-h-[90vh] flex transition-all duration-300 ${
-          showCalendar ? "max-w-5xl flex-row" : "max-w-lg flex-col"
+          (showCalendar || showScript) ? "max-w-5xl flex-row" : "max-w-lg flex-col"
         }`}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
@@ -373,7 +377,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
               {selectedResult === "アポ獲得" && userSettings.calendarUrl && (
                 <div className="mb-4">
                   <button
-                    onClick={() => setShowCalendar(!showCalendar)}
+                    onClick={() => { setShowCalendar(!showCalendar); setShowScript(false); }}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
                       showCalendar
                         ? "bg-emerald-600 text-white border-emerald-600"
@@ -381,6 +385,22 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
                     }`}
                   >
                     📅 {showCalendar ? "カレンダーを閉じる" : "カレンダーで空き日程を確認"}
+                  </button>
+                </div>
+              )}
+
+              {/* トークスクリプトボタン */}
+              {activeScript && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => { setShowScript(!showScript); setShowCalendar(false); }}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                      showScript
+                        ? "bg-violet-600 text-white border-violet-600"
+                        : "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                    }`}
+                  >
+                    📋 {showScript ? "スクリプトを閉じる" : `スクリプトを表示（${activeScript.name}）`}
                   </button>
                 </div>
               )}
@@ -546,6 +566,27 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
               style={{ minHeight: "500px" }}
               frameBorder="0"
             />
+          </div>
+        )}
+
+        {/* 右カラム：トークスクリプト */}
+        {showScript && activeScript && (
+          <div className="w-[480px] shrink-0 border-l border-slate-200 flex flex-col max-h-[90vh]">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <span className="text-xs font-semibold text-violet-700">📋 {activeScript.name}</span>
+                <span className="text-xs text-slate-400 ml-2">トークスクリプト</span>
+              </div>
+              <button
+                onClick={() => setShowScript(false)}
+                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-500 px-3 py-1.5 rounded-lg transition-all"
+              >
+                閉じる
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">{activeScript.content}</pre>
+            </div>
           </div>
         )}
       </div>
