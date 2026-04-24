@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechLead - テレアポ生産性向上ツール</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif; background: #0f172a; color: #fff; overflow: hidden; }
+
+  .slide { display: none; width: 100vw; height: 100vh; padding: 52px 80px 80px; flex-direction: column; justify-content: center; position: relative; }
+  .slide.active { display: flex; }
+
+  .nav { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; align-items: center; z-index: 100; }
+  .nav button { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 22px; border-radius: 999px; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+  .nav button:hover { background: rgba(255,255,255,0.25); }
+  .nav .counter { color: rgba(255,255,255,0.4); font-size: 12px; min-width: 48px; text-align: center; }
+
+  /* ===== スライド1: タイトル ===== */
+  .s1 { background: linear-gradient(135deg, #0a0f1e 0%, #0f2744 60%, #1a1060 100%); align-items: flex-start; justify-content: center; }
+  .s1-inner { max-width: 640px; }
+  .s1 .eyebrow { font-size: 12px; color: #38bdf8; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 24px; }
+  .s1 .logo { font-size: 80px; font-weight: 900; background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; margin-bottom: 24px; }
+  .s1 .tagline { font-size: 22px; color: #cbd5e1; line-height: 1.6; margin-bottom: 36px; }
+  .s1 .tagline strong { color: #fff; }
+  .s1 .badges { display: flex; gap: 10px; flex-wrap: wrap; }
+  .s1 .badge { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); color: #7dd3fc; padding: 6px 16px; border-radius: 999px; font-size: 13px; }
+  .s1-visual { position: absolute; right: 80px; top: 50%; transform: translateY(-50%); width: 460px; }
+  .mini-app { background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.6); }
+  .mini-app-bar { background: #0f172a; padding: 10px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .mini-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mini-tabs { display: flex; gap: 2px; padding: 8px 12px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .mini-tab { padding: 5px 12px; border-radius: 6px; font-size: 11px; color: #64748b; cursor: default; }
+  .mini-tab.active { background: #1e293b; color: #e2e8f0; }
+  .mini-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11px; color: #94a3b8; }
+  .mini-row.calling { background: rgba(16,185,129,0.08); border-left: 3px solid #10b981; }
+  .mini-badge { padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+  .mb-appo { background: rgba(16,185,129,0.2); color: #10b981; }
+  .mb-doc { background: rgba(139,92,246,0.2); color: #a78bfa; }
+  .mb-recall { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .mb-away { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .mb-now { background: rgba(16,185,129,0.15); color: #34d399; font-size: 9px; }
+
+  /* ===== スライド2: 課題 ===== */
+  .s2 { background: #0a0f1e; }
+  .pain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 36px; }
+  .pain-card { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25); border-radius: 14px; padding: 24px 28px; }
+  .pain-card .icon { font-size: 28px; margin-bottom: 10px; }
+  .pain-card h3 { font-size: 16px; color: #fca5a5; margin-bottom: 7px; font-weight: 700; }
+  .pain-card p { font-size: 13px; color: #94a3b8; line-height: 1.7; }
+
+  /* ===== スライド3: ソリューション概要 ===== */
+  .s3 { background: linear-gradient(135deg, #0a0f1e 0%, #0f1f38 100%); }
+  .app-mockup { margin-top: 28px; background: #1e293b; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
+  .app-titlebar { background: #0f172a; padding: 10px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .app-dots { display: flex; gap: 6px; }
+  .app-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .app-name { font-size: 13px; color: #64748b; margin-left: 8px; }
+  .app-tabs { display: flex; gap: 0; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 16px; }
+  .app-tab { padding: 10px 18px; font-size: 12px; color: #64748b; border-bottom: 2px solid transparent; cursor: default; }
+  .app-tab.on { color: #38bdf8; border-bottom-color: #38bdf8; }
+  .app-body { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .app-stat { padding: 16px 20px; border-right: 1px solid rgba(255,255,255,0.05); }
+  .app-stat:last-child { border-right: none; }
+  .app-stat .val { font-size: 28px; font-weight: 800; }
+  .app-stat .lbl { font-size: 11px; color: #64748b; margin-top: 3px; }
+  .app-stat .sub { font-size: 11px; margin-top: 4px; }
+  .app-table-wrap { border-top: 1px solid rgba(255,255,255,0.05); }
+  .app-th { display: grid; grid-template-columns: 2.2fr 1.2fr 0.8fr 1fr 1fr; padding: 8px 20px; background: rgba(255,255,255,0.04); font-size: 11px; color: #475569; gap: 8px; }
+  .app-tr { display: grid; grid-template-columns: 2.2fr 1.2fr 0.8fr 1fr 1fr; padding: 9px 20px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 11px; color: #94a3b8; gap: 8px; align-items: center; }
+  .app-tr.now { border-left: 3px solid #10b981; background: rgba(16,185,129,0.06); padding-left: 17px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+  .t-appo { background: rgba(16,185,129,0.2); color: #10b981; }
+  .t-doc { background: rgba(139,92,246,0.2); color: #a78bfa; }
+  .t-recall { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .t-away { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .t-ng { background: rgba(239,68,68,0.2); color: #f87171; }
+  .t-now { background: rgba(16,185,129,0.15); color: #34d399; }
+
+  /* ===== スライド4: コールリスト ===== */
+  .s4 { background: #0a0f1e; }
+  .s4-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 28px; align-items: start; }
+  .point-list { display: flex; flex-direction: column; gap: 20px; }
+  .point { display: flex; gap: 16px; align-items: flex-start; }
+  .point-num { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #818cf8); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+  .point-text h4 { font-size: 15px; color: #e2e8f0; margin-bottom: 4px; }
+  .point-text p { font-size: 13px; color: #64748b; line-height: 1.6; }
+  .call-mock { background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; }
+  .call-mock-hd { background: #0f172a; padding: 10px 16px; font-size: 12px; color: #64748b; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; }
+  .call-mock-hd span { color: #38bdf8; }
+  .cm-row { display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 11px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: #94a3b8; align-items: center; gap: 8px; }
+  .cm-row.sel { background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding-left: 13px; }
+  .cm-row.calling-row { background: rgba(16,185,129,0.07); border-left: 3px solid #10b981; padding-left: 13px; }
+  .nav-arrows { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; background: #0f172a; border-top: 1px solid rgba(255,255,255,0.06); }
+  .arr-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; padding: 5px 14px; border-radius: 6px; font-size: 12px; cursor: default; }
+  .arr-btn.primary { background: #38bdf8; color: #0f172a; border-color: #38bdf8; font-weight: 700; }
+
+  /* ===== スライド5: 結果入力 ===== */
+  .s5 { background: linear-gradient(135deg, #0a0f1e 0%, #0f1a30 100%); }
+  .s5-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 28px; align-items: start; }
+  .modal-mock { background: #1e293b; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+  .modal-hd { padding: 14px 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px; color: #e2e8f0; font-weight: 600; }
+  .modal-hd span { color: #64748b; font-size: 12px; font-weight: 400; margin-left: 8px; }
+  .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-field label { font-size: 11px; color: #64748b; margin-bottom: 6px; display: block; }
+  .result-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rb { padding: 6px 14px; border-radius: 8px; font-size: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: #94a3b8; cursor: default; }
+  .rb.sel-appo { background: rgba(16,185,129,0.2); border-color: #10b981; color: #10b981; font-weight: 700; }
+  .rb.sel-doc { background: rgba(139,92,246,0.2); border-color: #a78bfa; color: #a78bfa; }
+  .rb.sel-recall { background: rgba(245,158,11,0.2); border-color: #fbbf24; color: #fbbf24; }
+  .rb.sel-ng { background: rgba(239,68,68,0.15); border-color: #f87171; color: #f87171; }
+  .tag-area { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag-chip { padding: 4px 10px; border-radius: 6px; font-size: 11px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #64748b; cursor: default; }
+  .tag-chip.on { background: rgba(56,189,248,0.15); border-color: #38bdf8; color: #38bdf8; }
+  .modal-memo { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #94a3b8; min-height: 48px; }
+  .modal-footer { padding: 12px 20px; background: #0f172a; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 8px; justify-content: flex-end; }
+  .mf-btn { padding: 7px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: default; border: none; }
+  .mf-save { background: #38bdf8; color: #0f172a; }
+  .mf-cancel { background: rgba(255,255,255,0.08); color: #64748b; }
+
+  /* ===== スライド6: スクリプト分析 ===== */
+  .s6 { background: #0a0f1e; }
+  .s6-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 28px; }
+  .script-tbl { background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; }
+  .st-hd { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 0.8fr; padding: 10px 16px; background: rgba(255,255,255,0.05); font-size: 11px; color: #64748b; gap: 8px; }
+  .st-row { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 0.8fr; padding: 11px 16px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: #94a3b8; gap: 8px; align-items: center; }
+  .rate-high { color: #10b981; font-weight: 800; font-size: 14px; }
+  .rate-mid { color: #fbbf24; font-weight: 700; }
+  .rate-low { color: #f87171; }
+  .ai-box { background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2); border-radius: 12px; padding: 20px; }
+  .ai-box h4 { font-size: 13px; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .ai-insight { display: flex; flex-direction: column; gap: 12px; }
+  .ai-item { display: flex; gap: 10px; align-items: flex-start; }
+  .ai-item .dot { width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; margin-top: 5px; flex-shrink: 0; }
+  .ai-item p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+  .ai-item strong { color: #e2e8f0; }
+  .tag-analysis { background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); padding: 16px; margin-top: 16px; }
+  .tag-analysis h4 { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+  .tag-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .tag-bar-label { font-size: 12px; color: #94a3b8; width: 120px; flex-shrink: 0; }
+  .tag-bar-wrap { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 6px; }
+  .tag-bar-fill { height: 6px; border-radius: 4px; }
+  .tag-bar-val { font-size: 11px; color: #64748b; width: 32px; text-align: right; }
+
+  /* ===== スライド7: 進捗 ===== */
+  .s7 { background: linear-gradient(135deg, #0a0f1e 0%, #0f1a30 100%); }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 28px; }
+  .kpi-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px 16px; text-align: center; }
+  .kpi-val { font-size: 34px; font-weight: 900; }
+  .kpi-lbl { font-size: 11px; color: #64748b; margin-top: 4px; }
+  .kpi-goal { font-size: 11px; margin-top: 4px; }
+  .member-tbl { margin-top: 20px; background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; }
+  .mtbl-hd { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; padding: 9px 20px; background: rgba(255,255,255,0.05); font-size: 11px; color: #475569; gap: 8px; }
+  .mtbl-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; padding: 11px 20px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: #94a3b8; gap: 8px; align-items: center; }
+  .mtbl-row.top { background: rgba(16,185,129,0.05); }
+
+  /* ===== スライド8: まとめ ===== */
+  .s8 { background: linear-gradient(135deg, #0a0f1e 0%, #0e1e40 60%, #15103a 100%); align-items: center; text-align: center; }
+  .s8 .big-title { font-size: 40px; font-weight: 900; color: #f1f5f9; line-height: 1.3; margin-bottom: 12px; }
+  .s8 .big-sub { font-size: 16px; color: #64748b; margin-bottom: 44px; }
+  .outcome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; width: 100%; margin-bottom: 36px; }
+  .outcome-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-radius: 16px; padding: 28px 20px; }
+  .outcome-icon { font-size: 32px; margin-bottom: 12px; }
+  .outcome-num { font-size: 44px; font-weight: 900; margin-bottom: 8px; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .outcome-card p { font-size: 13px; color: #94a3b8; line-height: 1.7; }
+  .s8-footer { font-size: 14px; color: #475569; }
+
+  /* 共通 */
+  .section-label { font-size: 11px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+  .slide-title { font-size: 32px; font-weight: 800; color: #f1f5f9; line-height: 1.2; }
+  .slide-sub { font-size: 14px; color: #64748b; margin-top: 8px; line-height: 1.6; }
+  .accent { color: #38bdf8; }
+  .green { color: #10b981; }
+  .purple { color: #a78bfa; }
+  .amber { color: #fbbf24; }
+  .blue { color: #60a5fa; }
+  .red { color: #f87171; }
+</style>
+</head>
+<body>
+
+<!-- スライド1: タイトル -->
+<div class="slide s1 active">
+  <div class="s1-inner">
+    <div class="eyebrow">Telesales Productivity Tool</div>
+    <div class="logo">TechLead</div>
+    <div class="tagline"><strong>質の高いアポを、大量に。</strong><br>テレアポチームの生産性を根本から変えるツール</div>
+    <div class="badges">
+      <span class="badge">コールリスト管理</span>
+      <span class="badge">スクリプト分析</span>
+      <span class="badge">KPI自動集計</span>
+      <span class="badge">リアルタイム共有</span>
+    </div>
+  </div>
+  <div class="s1-visual">
+    <div class="mini-app">
+      <div class="mini-app-bar">
+        <div class="mini-dot" style="background:#ef4444"></div>
+        <div class="mini-dot" style="background:#fbbf24"></div>
+        <div class="mini-dot" style="background:#10b981"></div>
+        <span style="font-size:11px; color:#475569; margin-left:8px;">TechLead</span>
+      </div>
+      <div class="mini-tabs">
+        <div class="mini-tab active">コールリスト</div>
+        <div class="mini-tab">進捗</div>
+        <div class="mini-tab">戦略</div>
+        <div class="mini-tab">設定</div>
+      </div>
+      <div class="mini-row calling">
+        <div style="flex:2;color:#e2e8f0">株式会社テックビジョン</div>
+        <div style="flex:1"><span class="mini-badge mb-now">架電中</span></div>
+        <div style="flex:1"><span class="mini-badge mb-appo">アポ獲得</span></div>
+      </div>
+      <div class="mini-row">
+        <div style="flex:2">株式会社デジタルフロンティア</div>
+        <div style="flex:1">岩崎</div>
+        <div style="flex:1"><span class="mini-badge mb-doc">資料送付</span></div>
+      </div>
+      <div class="mini-row">
+        <div style="flex:2">株式会社クラウドネクスト</div>
+        <div style="flex:1">金</div>
+        <div style="flex:1"><span class="mini-badge mb-recall">再コール</span></div>
+      </div>
+      <div class="mini-row">
+        <div style="flex:2">合同会社スマートシステムズ</div>
+        <div style="flex:1">平塚</div>
+        <div style="flex:1"><span class="mini-badge mb-away">担当不在</span></div>
+      </div>
+      <div class="mini-row">
+        <div style="flex:2">株式会社イノベートラボ</div>
+        <div style="flex:1">長尾</div>
+        <div style="flex:1" style="color:#475569">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スライド2: 課題 -->
+<div class="slide s2">
+  <div class="section-label">Problem</div>
+  <div class="slide-title">スプレッドシート管理の<span class="accent">限界</span></div>
+  <div class="slide-sub">架電の手が止まる原因はツールにある</div>
+  <div class="pain-grid">
+    <div class="pain-card">
+      <div class="icon">😩</div>
+      <h3>スプレッドシートへの入力がとにかく面倒</h3>
+      <p>セルを探して、開いて、打ち込む。コールのたびに手が止まる。入力が億劫でメモが雑になり、後で活かせない。</p>
+    </div>
+    <div class="pain-card">
+      <div class="icon">🛠️</div>
+      <h3>コールリストを自分たちで作らないといけない</h3>
+      <p>企業名・電話番号・担当者…フォーマットを毎回ゼロから整える。リスト整備に時間を使いすぎている。</p>
+    </div>
+    <div class="pain-card">
+      <div class="icon">🔄</div>
+      <h3>カレンダーとスクリプトの行き来が面倒</h3>
+      <p>アポが取れたらカレンダーへ、次のコールではスクリプトを確認…複数ツールを行き来して集中力が途切れる。</p>
+    </div>
+    <div class="pain-card">
+      <div class="icon">📊</div>
+      <h3>何が刺さったか分析できない</h3>
+      <p>どのトーク・どの商材が受注につながるか記録がバラバラ。感覚頼りの営業から抜け出せない。</p>
+    </div>
+  </div>
+</div>
+
+<!-- スライド3: 全体概要 -->
+<div class="slide s3">
+  <div class="section-label">Solution</div>
+  <div class="slide-title">テレアポに必要な機能を<span class="accent">ワンツールに</span></div>
+  <div class="slide-sub">コール・記録・分析・チーム管理。バラバラだったものをTechLeadひとつに集約</div>
+  <div class="app-mockup">
+    <div class="app-titlebar">
+      <div class="app-dots">
+        <div class="app-dot" style="background:#ef4444"></div>
+        <div class="app-dot" style="background:#fbbf24"></div>
+        <div class="app-dot" style="background:#10b981"></div>
+      </div>
+      <div class="app-name">TechLead — 4月の進捗</div>
+    </div>
+    <div class="app-tabs">
+      <div class="app-tab">コールリスト</div>
+      <div class="app-tab on">進捗</div>
+      <div class="app-tab">戦略</div>
+      <div class="app-tab">スクリプト</div>
+    </div>
+    <div class="app-body">
+      <div class="app-stat">
+        <div class="val green">127</div>
+        <div class="lbl">今月の総コール数</div>
+        <div class="sub green">目標 100件 達成 ✓</div>
+      </div>
+      <div class="app-stat">
+        <div class="val purple">8</div>
+        <div class="lbl">アポ獲得数</div>
+        <div class="sub purple">アポ率 6.3%（業界平均の2倍）</div>
+      </div>
+      <div class="app-stat">
+        <div class="val amber">12</div>
+        <div class="lbl">資料送付（フォロー中）</div>
+        <div class="sub" style="color:#fbbf24">受注候補 3件</div>
+      </div>
+    </div>
+    <div class="app-table-wrap">
+      <div class="app-th"><span>会社名</span><span>電話番号</span><span>担当</span><span>結果</span><span>次回日</span></div>
+      <div class="app-tr now"><span>株式会社テックビジョン <span class="tag t-now">架電中</span></span><span>03-1234-5001</span><span>山崎</span><span><span class="tag t-appo">アポ獲得</span></span><span>04/28</span></div>
+      <div class="app-tr"><span>株式会社デジタルフロンティア</span><span>03-2345-6001</span><span>岩崎</span><span><span class="tag t-doc">資料送付</span></span><span>04/30</span></div>
+      <div class="app-tr"><span>株式会社クラウドネクスト</span><span>03-3456-7001</span><span>金</span><span><span class="tag t-recall">再コール</span></span><span>04/25</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- スライド4: コールリスト -->
+<div class="slide s4">
+  <div class="section-label">Feature 01</div>
+  <div class="slide-title">止まらず<span class="accent">架け続けられる</span>コールリスト</div>
+  <div class="slide-sub">1クリックで結果記録、前後ナビで次の会社へ。スプレッドシートの3倍速で架電できる</div>
+  <div class="s4-layout">
+    <div class="point-list">
+      <div class="point">
+        <div class="point-num">1</div>
+        <div class="point-text">
+          <h4>CSVで一括取込</h4>
+          <p>既存のスプレッドシートをそのまま貼り付けてインポート。リスト整備はゼロから不要。</p>
+        </div>
+      </div>
+      <div class="point">
+        <div class="point-num">2</div>
+        <div class="point-text">
+          <h4>ワンクリックで結果記録</h4>
+          <p>アポ・再コール・不在などをボタン一発で記録。メモも音声入力に対応。</p>
+        </div>
+      </div>
+      <div class="point">
+        <div class="point-num">3</div>
+        <div class="point-text">
+          <h4>前後ナビで連続コール</h4>
+          <p>「次へ」ボタンで次の会社にワンクリック移動。電話しながらでも操作できる。</p>
+        </div>
+      </div>
+      <div class="point">
+        <div class="point-num">4</div>
+        <div class="point-text">
+          <h4>担当者アサイン機能</h4>
+          <p>会社ごとに担当者を設定。誰がどこを担当するか一目でわかる。</p>
+        </div>
+      </div>
+    </div>
+    <div class="call-mock">
+      <div class="call-mock-hd">コールリスト — IT業界リスト <span>全28社</span></div>
+      <div class="cm-row" style="background:rgba(255,255,255,0.03); font-size:10px; color:#475569; padding:6px 16px;">会社名 / 担当者 &nbsp;&nbsp;&nbsp; 結果 &nbsp;&nbsp;&nbsp; 次回日</div>
+      <div class="cm-row"><span style="color:#64748b; font-size:10px;">✓</span><span>株式会社テックビジョン</span><span><span class="tag t-appo">アポ獲得</span></span></div>
+      <div class="cm-row"><span style="color:#64748b; font-size:10px;">✓</span><span>株式会社リクルートテック</span><span><span class="tag t-doc">資料送付</span></span></div>
+      <div class="cm-row sel"><span style="color:#38bdf8; font-size:11px;">▶</span><span style="color:#e2e8f0">株式会社クラウドネクスト</span><span style="color:#38bdf8; font-size:11px;">架電中</span></div>
+      <div class="cm-row"><span></span><span>合同会社スマートシステムズ</span><span style="color:#475569">—</span></div>
+      <div class="cm-row"><span></span><span>株式会社イノベートラボ</span><span style="color:#475569">—</span></div>
+      <div class="cm-row"><span></span><span>株式会社プロジェクトワン</span><span style="color:#475569">—</span></div>
+      <div class="nav-arrows">
+        <div class="arr-btn">← 前へ</div>
+        <div class="arr-btn primary">次へ →</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スライド5: 結果入力・タグ記録 -->
+<div class="slide s5">
+  <div class="section-label">Feature 02</div>
+  <div class="slide-title">アポの<span class="accent">質を記録する</span>仕組み</div>
+  <div class="slide-sub">商材・課題・興味タグをワンクリックで記録。「何が刺さったか」をデータとして蓄積する</div>
+  <div class="s5-layout">
+    <div>
+      <div class="point-list">
+        <div class="point">
+          <div class="point-num">1</div>
+          <div class="point-text">
+            <h4>結果を4分類でボタン記録</h4>
+            <p>アポ獲得・資料送付・再コール・NGを選ぶだけ。入力時間は5秒。</p>
+          </div>
+        </div>
+        <div class="point">
+          <div class="point-num">2</div>
+          <div class="point-text">
+            <h4>商材・課題・興味をタグで記録</h4>
+            <p>「採用支援に興味あり」「コスト削減が課題」などをタグで蓄積。質の高いデータが溜まる。</p>
+          </div>
+        </div>
+        <div class="point">
+          <div class="point-num">3</div>
+          <div class="point-text">
+            <h4>スクリプトを並べて参照</h4>
+            <p>コール画面の隣にスクリプトを表示。別タブを開かずにその場で確認できる。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-mock">
+      <div class="modal-hd">架電結果を記録 <span>株式会社クラウドネクスト</span></div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label>結果</label>
+          <div class="result-btns">
+            <div class="rb sel-appo">✓ アポ獲得</div>
+            <div class="rb sel-doc">資料送付</div>
+            <div class="rb sel-recall">再コール</div>
+            <div class="rb">担当者不在</div>
+            <div class="rb sel-ng">NG</div>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>商材（興味を持ったもの）</label>
+          <div class="tag-area">
+            <div class="tag-chip on">採用支援</div>
+            <div class="tag-chip on">HR分析</div>
+            <div class="tag-chip">組織診断</div>
+            <div class="tag-chip">研修</div>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>課題・ペイン</label>
+          <div class="tag-area">
+            <div class="tag-chip on">応募が集まらない</div>
+            <div class="tag-chip">内定辞退が多い</div>
+            <div class="tag-chip on">定着率が低い</div>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>メモ</label>
+          <div class="modal-memo">来月末に決裁者と話せる。採用コストの削減に強い関心あり。</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="mf-btn mf-cancel">キャンセル</div>
+        <div class="mf-btn mf-save">保存して次へ →</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スライド6: スクリプト分析 -->
+<div class="slide s6">
+  <div class="section-label">Feature 03</div>
+  <div class="slide-title">どのトークが<span class="accent">受注につながるか</span>わかる</div>
+  <div class="slide-sub">蓄積したタグデータをAIが分析。「感覚」を「再現性」に変える</div>
+  <div class="s6-layout">
+    <div>
+      <div class="script-tbl">
+        <div class="st-hd"><span>スクリプト名</span><span>コール</span><span>アポ</span><span>アポ率</span></div>
+        <div class="st-row"><span style="color:#e2e8f0">採用課題訴求型</span><span>48</span><span>6</span><span class="rate-high">12.5%</span></div>
+        <div class="st-row"><span style="color:#e2e8f0">コスト削減訴求型</span><span>35</span><span>3</span><span class="rate-mid">8.6%</span></div>
+        <div class="st-row"><span style="color:#e2e8f0">事例紹介型</span><span>44</span><span>2</span><span class="rate-low">4.5%</span></div>
+      </div>
+      <div class="tag-analysis">
+        <h4>刺さった課題TOP3（アポ獲得企業）</h4>
+        <div class="tag-bar-row">
+          <div class="tag-bar-label">応募が集まらない</div>
+          <div class="tag-bar-wrap"><div class="tag-bar-fill" style="width:78%; background:#10b981;"></div></div>
+          <div class="tag-bar-val green">78%</div>
+        </div>
+        <div class="tag-bar-row">
+          <div class="tag-bar-label">採用コスト削減</div>
+          <div class="tag-bar-wrap"><div class="tag-bar-fill" style="width:62%; background:#38bdf8;"></div></div>
+          <div class="tag-bar-val blue">62%</div>
+        </div>
+        <div class="tag-bar-row">
+          <div class="tag-bar-label">定着率が低い</div>
+          <div class="tag-bar-wrap"><div class="tag-bar-fill" style="width:45%; background:#a78bfa;"></div></div>
+          <div class="tag-bar-val purple">45%</div>
+        </div>
+      </div>
+    </div>
+    <div class="ai-box">
+      <h4>🤖 AIからの分析・提案</h4>
+      <div class="ai-insight">
+        <div class="ai-item">
+          <div class="dot"></div>
+          <p><strong>「採用課題訴求型」</strong>がアポ率12.5%でトップ。「応募が集まらない」への共感が特に効果的。チーム全員このスクリプトを優先すべき。</p>
+        </div>
+        <div class="ai-item">
+          <div class="dot"></div>
+          <p><strong>「事例紹介型」</strong>はアポ率が低下。冒頭で相手の課題を引き出す質問を追加することで改善が見込める。</p>
+        </div>
+        <div class="ai-item">
+          <div class="dot"></div>
+          <p><strong>製造業・IT業界</strong>での反応が特に良い。この2業界に絞ったリストを優先的に架電するとさらなる成果が見込める。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スライド7: 進捗・KPI -->
+<div class="slide s7">
+  <div class="section-label">Feature 04</div>
+  <div class="slide-title">チーム全員の<span class="accent">KPIをリアルタイムで</span>把握</div>
+  <div class="slide-sub">今日・今週・今月を切り替えて確認。マネージャーの集計作業をゼロに</div>
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-val green">127</div><div class="kpi-lbl">総コール数</div><div class="kpi-goal green">目標 100件 ✓</div></div>
+    <div class="kpi-card"><div class="kpi-val purple">8</div><div class="kpi-lbl">アポ獲得</div><div class="kpi-goal purple">アポ率 6.3%</div></div>
+    <div class="kpi-card"><div class="kpi-val amber">12</div><div class="kpi-lbl">資料送付</div><div class="kpi-goal amber">フォロー中</div></div>
+    <div class="kpi-card"><div class="kpi-val blue">21h</div><div class="kpi-lbl">チーム稼働時間</div><div class="kpi-goal" style="color:#64748b">今月合計</div></div>
+  </div>
+  <div class="member-tbl">
+    <div class="mtbl-hd"><span>メンバー</span><span>コール数</span><span>アポ</span><span>資料送付</span><span>アポ率</span><span>稼働時間</span></div>
+    <div class="mtbl-row top"><span style="color:#e2e8f0">🥇 山崎</span><span>32</span><span class="green">3</span><span>4</span><span class="green">9.4%</span><span>5.0h</span></div>
+    <div class="mtbl-row"><span>長尾</span><span>28</span><span class="amber">2</span><span>3</span><span class="amber">7.1%</span><span>4.5h</span></div>
+    <div class="mtbl-row"><span>金</span><span>25</span><span class="amber">2</span><span>2</span><span class="amber">8.0%</span><span>4.0h</span></div>
+    <div class="mtbl-row"><span>岩崎</span><span>24</span><span>1</span><span>2</span><span style="color:#64748b">4.2%</span><span>4.0h</span></div>
+    <div class="mtbl-row"><span>平塚</span><span>18</span><span>0</span><span>1</span><span class="red">0%</span><span>3.5h</span></div>
+  </div>
+</div>
+
+<!-- スライド8: まとめ -->
+<div class="slide s8">
+  <div class="section-label">Summary</div>
+  <div class="big-title">質の高いアポを大量に取り、<br><span class="accent">受注につなげる</span></div>
+  <div class="big-sub">TechLeadは「架電する」から「受注する」までの全プロセスを支援する</div>
+  <div class="outcome-grid">
+    <div class="outcome-card">
+      <div class="outcome-icon">⚡</div>
+      <div class="outcome-num">3x</div>
+      <p>スプレッドシートと比べて<br>1件あたりの入力時間が<strong style="color:#e2e8f0">3分の1</strong>に。架電数が増える。</p>
+    </div>
+    <div class="outcome-card">
+      <div class="outcome-icon">🎯</div>
+      <div class="outcome-num">2x</div>
+      <p>刺さるトークをデータで特定。<br>チーム全員のアポ率が<strong style="color:#e2e8f0">2倍</strong>を目指せる。</p>
+    </div>
+    <div class="outcome-card">
+      <div class="outcome-icon">📈</div>
+      <div class="outcome-num">0h</div>
+      <p>マネージャーの集計・報告作業が<strong style="color:#e2e8f0">ゼロ</strong>に。管理コストを削減。</p>
+    </div>
+  </div>
+  <div class="s8-footer">現在、インターン生5名のチームで実際に使用中 — 今日からすぐに導入できます</div>
+</div>
+
+<!-- ナビゲーション -->
+<div class="nav">
+  <button onclick="prevSlide()">← 前へ</button>
+  <span class="counter" id="counter">1 / 8</span>
+  <button onclick="nextSlide()">次へ →</button>
+</div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  function showSlide(n) {
+    slides[current].classList.remove('active');
+    current = (n + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = (current + 1) + ' / ' + slides.length;
+  }
+  function nextSlide() { showSlide(current + 1); }
+  function prevSlide() { showSlide(current - 1); }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+  });
+</script>
+</body>
+</html>
