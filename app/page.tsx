@@ -455,7 +455,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="px-4 md:px-8 py-4 md:py-6 max-w-7xl mx-auto">
+      <div className="px-3 sm:px-4 md:px-8 py-3 md:py-6 max-w-7xl mx-auto">
         {tab === "list" && (
           <>
             {/* チーム架電状況（リアルタイム） */}
@@ -590,18 +590,18 @@ export default function Home() {
                 {currentList && (
                   <>
                     {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
                       {[
                         { label: "総件数", value: currentList.companies.length, highlight: false },
                         { label: "本日ネクスト", value: todayNextCount, highlight: todayNextCount > 0 },
-                        { label: "本日コール数", value: todayCallCount, highlight: false },
-                        { label: "アポ獲得（累計）", value: appoCount, highlight: appoCount > 0 },
+                        { label: "本日コール", value: todayCallCount, highlight: false },
+                        { label: "アポ（累計）", value: appoCount, highlight: appoCount > 0 },
                       ].map((s) => (
-                        <div key={s.label} className={`rounded-xl p-5 border shadow-sm ${
+                        <div key={s.label} className={`rounded-xl px-4 py-3 md:p-5 border shadow-sm ${
                           s.highlight ? "bg-violet-50 border-violet-200" : "bg-white border-slate-200"
                         }`}>
-                          <div className={`text-3xl font-bold ${s.highlight ? "text-violet-600" : "text-slate-900"}`}>{s.value}</div>
-                          <div className="text-xs text-slate-400 mt-1">{s.label}</div>
+                          <div className={`text-2xl md:text-3xl font-bold ${s.highlight ? "text-violet-600" : "text-slate-900"}`}>{s.value}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{s.label}</div>
                         </div>
                       ))}
                     </div>
@@ -610,41 +610,41 @@ export default function Home() {
                     <div className="space-y-2 mb-4">
                       {/* 検索欄 */}
                       <div className="flex items-center gap-2">
-                        <div className="relative flex-1 max-w-sm">
+                        <div className="relative flex-1">
                           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                           </svg>
                           <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setSelectedIndex(null); }}
                             placeholder="企業名・業種・担当者名で検索..."
-                            className="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-400 transition-all" />
+                            className="w-full pl-9 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-violet-400 transition-all" />
                           {search && (
-                            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
+                            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-base">✕</button>
                           )}
                         </div>
-                        {isGlobalSearch && (
-                          <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-lg font-medium shrink-0">
-                            全リスト検索中 · {filtered.length}件
-                          </span>
-                        )}
-                        <div className="ml-auto">
-                          <button
-                            onClick={() => setAppendingToListId(currentList.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-lg text-xs transition-all"
-                          >
-                            ＋ 企業を追加
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setAppendingToListId(currentList.id)}
+                          className="shrink-0 flex items-center gap-1 px-3 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-300 text-slate-500 hover:text-violet-600 rounded-xl text-xs transition-all"
+                        >
+                          <span className="hidden sm:inline">＋ 企業を追加</span>
+                          <span className="sm:hidden text-base leading-none">＋</span>
+                        </button>
                       </div>
 
-                      {/* フィルターバー */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex gap-1 flex-wrap">
+                      {isGlobalSearch && (
+                        <div className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-3 py-2 rounded-lg font-medium">
+                          全リスト検索中 · {filtered.length}件ヒット
+                        </div>
+                      )}
+
+                      {/* フィルターバー：横スクロール */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
                           {FILTER_OPTIONS.map((f) => (
                             <button key={f} onClick={() => setFilterResult(f)}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
                                 filterResult === f ? "bg-slate-800 text-white"
-                                : f === "本日ネクスト" && todayNextCount > 0 ? "bg-violet-100 text-violet-700 hover:bg-violet-200"
-                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                                : f === "本日ネクスト" && todayNextCount > 0 ? "bg-violet-100 text-violet-700"
+                                : "bg-white text-slate-600 border border-slate-200"
                               }`}>
                               {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
                             </button>
@@ -654,9 +654,9 @@ export default function Home() {
                           <select
                             value={filterAssignee}
                             onChange={(e) => setFilterAssignee(e.target.value)}
-                            className="ml-auto text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-600 focus:outline-none focus:border-violet-400 transition-all cursor-pointer"
+                            className="shrink-0 text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:border-violet-400 transition-all cursor-pointer"
                           >
-                            <option value="すべて">担当：すべて</option>
+                            <option value="すべて">担当：全員</option>
                             {assigneeOptions.map(a => (
                               <option key={a} value={a}>{a}</option>
                             ))}
@@ -665,8 +665,85 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Table */}
-                    <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm bg-white">
+                    {/* ── モバイル：カード表示 ── */}
+                    <div className="sm:hidden space-y-2">
+                      {filtered.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400 text-sm">条件に一致する企業がありません</div>
+                      ) : filtered.map((company, i) => {
+                        const isNextToday = company.nextDate === today;
+                        const activeCall = activeCalls.find((a) => a.companyId === company.id);
+                        const isMyCall = activeCall?.userId === user?.id;
+                        const otherColorIdx = activeCall && !isMyCall ? memberColorMap.get(activeCall.userId) : undefined;
+                        const otherColor = otherColorIdx !== undefined ? MEMBER_ROW_COLORS[otherColorIdx] : undefined;
+
+                        const cardBorder = isMyCall
+                          ? "border-l-4 border-l-emerald-500 bg-emerald-50/40"
+                          : otherColor
+                          ? `border-l-4 ${otherColor.border} ${otherColor.bg}`
+                          : isNextToday
+                          ? "border-l-4 border-l-violet-400 bg-violet-50/40"
+                          : "border-slate-200";
+
+                        return (
+                          <div key={company.id} onClick={() => setSelectedIndex(i)}
+                            className={`bg-white rounded-2xl border px-4 py-4 cursor-pointer active:bg-slate-50 transition-colors ${cardBorder}`}>
+                            {/* 1行目: 会社名 + 結果バッジ */}
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                {isNextToday && !activeCall && <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />}
+                                <span className="font-bold text-slate-900 text-base leading-tight">{company.company}</span>
+                                {isMyCall && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 shrink-0">架電中</span>}
+                                {otherColor && activeCall && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${otherColor.badge}`}>{activeCall.userName}</span>}
+                                {isGlobalSearch && (company as FilteredCompany)._listName && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 shrink-0">{(company as FilteredCompany)._listName}</span>
+                                )}
+                              </div>
+                              {company.latestResult ? (
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${RESULT_CONFIG[company.latestResult].badge}`}>
+                                  {company.latestResult}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-300 shrink-0">未コール</span>
+                              )}
+                            </div>
+
+                            {/* 2行目: 業種・従業員 */}
+                            <div className="text-xs text-slate-400 mb-3">
+                              {[company.industry, company.employees ? `${company.employees}` : null].filter(Boolean).join(" · ")}
+                            </div>
+
+                            {/* 電話番号（大きいタップターゲット） */}
+                            {company.phone && (
+                              <a href={`tel:${company.phone}`} onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-3 active:bg-violet-100 transition-colors">
+                                <svg className="w-4 h-4 text-violet-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.75a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/>
+                                </svg>
+                                <span className="text-sm font-bold text-violet-700 font-mono">{company.phone}</span>
+                                <span className="text-xs text-violet-400 ml-auto">タップで発信</span>
+                              </a>
+                            )}
+
+                            {/* 担当・次回連絡日 */}
+                            <div className="flex items-center justify-between text-xs">
+                              <span className={`${company.assignee ? "text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full" : "text-slate-300"}`}>
+                                {company.assignee || "担当未設定"}
+                              </span>
+                              {company.nextDate ? (
+                                <span className={`font-semibold ${isNextToday ? "text-violet-600" : "text-slate-400"}`}>
+                                  {isNextToday ? "📅 今日" : company.nextDate}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">次回日未設定</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* ── デスクトップ：テーブル表示 ── */}
+                    <div className="hidden sm:block rounded-xl border border-slate-200 overflow-x-auto shadow-sm bg-white">
                       <table className="w-full text-sm min-w-[900px]">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 text-xs border-b border-slate-200">
