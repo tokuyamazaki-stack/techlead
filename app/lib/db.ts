@@ -342,6 +342,49 @@ export async function saveCompany(userId: string, listId: string, company: Compa
 }
 
 // ============================================================
+// 稼働時間
+// ============================================================
+
+export interface WorkingHoursRecord {
+  userId: string;
+  userName: string;
+  date: string;
+  hours: number;
+}
+
+export async function logWorkingHours(
+  workspaceId: string,
+  userId: string,
+  userName: string,
+  date: string,
+  hours: number,
+) {
+  await supabase.from("working_hours").upsert(
+    { workspace_id: workspaceId, user_id: userId, user_name: userName, date, hours },
+    { onConflict: "workspace_id,user_id,date" },
+  );
+}
+
+export async function getWorkingHours(
+  workspaceId: string,
+  from: string,
+  to: string,
+): Promise<WorkingHoursRecord[]> {
+  const { data } = await supabase
+    .from("working_hours")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .gte("date", from)
+    .lte("date", to);
+  return (data || []).map((r) => ({
+    userId: r.user_id,
+    userName: r.user_name,
+    date: r.date,
+    hours: Number(r.hours),
+  }));
+}
+
+// ============================================================
 // リアルタイム架電状況
 // ============================================================
 

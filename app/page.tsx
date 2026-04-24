@@ -9,7 +9,6 @@ import SettingsModal from "./components/SettingsModal";
 import DailyReport from "./components/DailyReport";
 import ProgressTab from "./components/ProgressTab";
 import StrategyTab from "./components/StrategyTab";
-import ReviewTab from "./components/ReviewTab";
 import FollowTab from "./components/FollowTab";
 import AuthModal from "./components/AuthModal";
 import WorkspaceSetup from "./components/WorkspaceSetup";
@@ -17,7 +16,7 @@ import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
 import type { ReportFormField } from "./lib/types";
 import { supabase } from "./lib/supabase";
 import * as db from "./lib/db";
-import type { Workspace, WorkspaceMember, ActiveCallInfo } from "./lib/db";
+import type { Workspace, WorkspaceMember, ActiveCallInfo, WorkingHoursRecord } from "./lib/db";
 import type { User } from "@supabase/supabase-js";
 
 // フォームURLのIDをキーに、既知の項目マッピングを定義
@@ -78,6 +77,7 @@ export default function Home() {
   const [filterResult, setFilterResult] = useState<string>("すべて");
   const [loading, setLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<ActiveCallInfo[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHoursRecord[]>([]);
 
   // 認証状態の監視
   useEffect(() => {
@@ -150,15 +150,20 @@ export default function Home() {
 
   async function loadData(userId: string, workspaceId: string) {
     setLoading(true);
-    const [loadedLists, loadedSettings, loadedTags, loadedGoals, loadedMembers] = await Promise.all([
+    const thisMonth = new Date().toISOString().substring(0, 7);
+    const monthStart = `${thisMonth}-01`;
+    const monthEnd = `${thisMonth}-31`;
+    const [loadedLists, loadedSettings, loadedTags, loadedGoals, loadedMembers, loadedHours] = await Promise.all([
       db.loadAllLists(workspaceId),
       db.loadUserSettings(userId),
       db.loadTagConfig(userId),
       db.loadGoalConfig(userId),
       db.getWorkspaceMembers(workspaceId),
+      db.getWorkingHours(workspaceId, monthStart, monthEnd),
     ]);
 
     setMembers(loadedMembers);
+    setWorkingHours(loadedHours);
 
     if (loadedLists.length === 0) {
       for (const list of DEMO_LISTS) {
@@ -288,6 +293,15 @@ export default function Home() {
     await db.updateListName(id, editingName.trim());
   }
 
+  async function handleLogHours(hours: number) {
+    if (!user || !workspace) return;
+    const today = todayStr();
+    await db.logWorkingHours(workspace.id, user.id, userSettings.name || user.email || "", today, hours);
+    const thisMonth = today.substring(0, 7);
+    const updated = await db.getWorkingHours(workspace.id, `${thisMonth}-01`, `${thisMonth}-31`);
+    setWorkingHours(updated);
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     setLists([]);
@@ -375,7 +389,6 @@ export default function Home() {
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
             { id: "follow" as Tab, label: `フォロー${followCount > 0 ? `(${followCount})` : ""}`, labelFull: `フォロー${followCount > 0 ? ` (${followCount})` : ""}` },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
-            { id: "review" as Tab, label: "振り返り", labelFull: "振り返り" },
             { id: "progress" as Tab, label: "進捗", labelFull: "進捗" },
             { id: "strategy" as Tab, label: "AI戦略", labelFull: "AI戦略" },
           ].map((t) => (
@@ -764,25 +777,14 @@ export default function Home() {
         )}
 
         {tab === "report" && <DailyReport companies={allCompanies} userSettings={userSettings} />}
-        {tab === "review" && (
-          <ReviewTab
-            lists={lists}
-            onSelectCompany={(companyId, listId) => {
-              const targetList = lists.find((l) => l.id === listId);
-              const targetCompany = targetList?.companies.find((c) => c.id === companyId);
-              setSelectedListId(listId);
-              setFilterResult("すべて");
-              setSearch(targetCompany?.company ?? "");
-              setSelectedIndex(0);
-              setTab("list");
-            }}
-          />
-        )}
         {tab === "progress" && (
           <ProgressTab
             companies={allCompanies}
             goalConfig={goalConfig}
             onUpdateGoals={handleUpdateGoals}
+            workingHours={workingHours}
+            onLogHours={handleLogHours}
+            currentUserName={userSettings.name}
           />
         )}
         {tab === "strategy" && (
