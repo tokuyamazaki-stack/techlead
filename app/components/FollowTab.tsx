@@ -26,7 +26,6 @@ export default function FollowTab({ lists, today, onOpen }: Props) {
   const allItems: FollowItem[] = lists.flatMap((list) =>
     list.companies
       .filter((c) => c.latestResult && (FOLLOW_RESULTS as readonly string[]).includes(c.latestResult))
-      .filter((c) => !c.nextDate || c.nextDate <= today)
       .map((c) => {
         let urgency: FollowItem["urgency"] = "unset";
         if (c.nextDate) {

@@ -358,8 +358,7 @@ export default function Home() {
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
 
   const followCount = allCompanies.filter((c) =>
-    c.latestResult && ["資料送付", "再コール", "担当者不在"].includes(c.latestResult) &&
-    (!c.nextDate || c.nextDate <= today)
+    c.latestResult && ["資料送付", "再コール", "担当者不在"].includes(c.latestResult)
   ).length;
 
   // 認証チェック中
