@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import type { Company, ResultType, CallRecord, TagConfig, UserSettings } from "../lib/types";
 import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS, NG_REASONS } from "../lib/types";
 import { today } from "../lib/parser";
+import { addBusinessDays } from "../lib/dateUtils";
 import MailModal from "./MailModal";
 
 interface Props {
@@ -167,18 +168,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   function logResult() {
     if (!selectedResult) return;
 
-    // 次回連絡日が未入力なら結果に応じて自動セット（土日スキップ）
-    function addBusinessDays(days: number): string {
-      const d = new Date();
-      let added = 0;
-      while (added < days) {
-        d.setDate(d.getDate() + 1);
-        const day = d.getDay(); // 0=日, 6=土
-        if (day !== 0 && day !== 6) added++;
-      }
-      return d.toISOString().split("T")[0];
-    }
-
+    // 次回連絡日が未入力なら結果に応じて自動セット（土日祝スキップ）
     let finalNextDate = nextDate;
     if (!nextDate) {
       if (selectedResult === "再コール" || selectedResult === "資料送付") {
