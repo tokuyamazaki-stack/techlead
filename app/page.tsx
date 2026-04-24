@@ -33,6 +33,15 @@ const KNOWN_FORM_CONFIGS: Record<string, ReportFormField[]> = {
 
 const DEFAULT_USER: UserSettings = { name: "", calendarUrl: "", reportFormUrl: "", phone: "", email: "" };
 
+// メンバーごとの色パレット（自分=緑、他メンバー用）
+const MEMBER_ROW_COLORS = [
+  { border: "border-l-blue-400",   bg: "bg-blue-50/60",   badge: "bg-blue-100 text-blue-700" },
+  { border: "border-l-amber-400",  bg: "bg-amber-50/60",  badge: "bg-amber-100 text-amber-700" },
+  { border: "border-l-pink-400",   bg: "bg-pink-50/60",   badge: "bg-pink-100 text-pink-700" },
+  { border: "border-l-cyan-400",   bg: "bg-cyan-50/60",   badge: "bg-cyan-100 text-cyan-700" },
+  { border: "border-l-orange-400", bg: "bg-orange-50/60", badge: "bg-orange-100 text-orange-700" },
+];
+
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
@@ -284,6 +293,12 @@ export default function Home() {
     setLists([]);
     setUserSettings(DEFAULT_USER);
   }
+
+  // 自分以外のメンバーに安定した色インデックスを割り当て
+  const memberColorMap = useMemo(() => {
+    const others = members.filter((m) => m.userId !== user?.id);
+    return new Map(others.map((m, i) => [m.userId, i % MEMBER_ROW_COLORS.length]));
+  }, [members, user?.id]);
 
   const today = todayStr();
   const currentList = lists.find((l) => l.id === selectedListId) ?? null;
@@ -670,17 +685,36 @@ export default function Home() {
                         <tbody>
                           {filtered.map((company, i) => {
                             const isNextToday = company.nextDate === today;
+                            const activeCall = activeCalls.find((a) => a.companyId === company.id);
+                            const isMyCall = activeCall?.userId === user?.id;
+                            const otherColorIdx = activeCall && !isMyCall
+                              ? memberColorMap.get(activeCall.userId)
+                              : undefined;
+                            const otherColor = otherColorIdx !== undefined
+                              ? MEMBER_ROW_COLORS[otherColorIdx]
+                              : undefined;
+
+                            const rowClass = isMyCall
+                              ? "border-l-4 border-l-emerald-500 bg-emerald-50/60 hover:bg-emerald-50"
+                              : otherColor
+                              ? `border-l-4 ${otherColor.border} ${otherColor.bg}`
+                              : isNextToday
+                              ? "border-l-4 border-l-transparent border-violet-100 bg-violet-50/60 hover:bg-violet-50"
+                              : "border-l-4 border-l-transparent border-slate-100 hover:bg-slate-50" + (i % 2 !== 0 ? " bg-slate-50/40" : "");
+
                             return (
                               <tr key={company.id} onClick={() => setSelectedIndex(i)}
-                                className={`cursor-pointer border-t transition-colors ${
-                                  isNextToday
-                                    ? "border-violet-100 bg-violet-50/60 hover:bg-violet-50"
-                                    : "border-slate-100 hover:bg-slate-50" + (i % 2 !== 0 ? " bg-slate-50/40" : "")
-                                }`}>
+                                className={`cursor-pointer border-t transition-colors ${rowClass}`}>
                                 <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2">
-                                    {isNextToday && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />}
+                                    {isNextToday && !activeCall && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />}
                                     <span className="font-semibold text-slate-800">{company.company}</span>
+                                    {isMyCall && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-700 shrink-0">あなた</span>
+                                    )}
+                                    {otherColor && activeCall && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${otherColor.badge}`}>{activeCall.userName}</span>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="px-4 py-3.5">
