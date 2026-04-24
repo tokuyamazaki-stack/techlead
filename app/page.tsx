@@ -149,9 +149,11 @@ export default function Home() {
 
   async function loadData(userId: string, workspaceId: string) {
     setLoading(true);
-    const thisMonth = new Date().toISOString().substring(0, 7);
+    const now = new Date();
+    const thisMonth = now.toISOString().substring(0, 7);
     const monthStart = `${thisMonth}-01`;
-    const monthEnd = `${thisMonth}-31`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthEnd = `${thisMonth}-${String(lastDay).padStart(2, "0")}`;
     const [loadedLists, loadedSettings, loadedTags, loadedGoals, loadedMembers, loadedHours] = await Promise.all([
       db.loadAllLists(workspaceId),
       db.loadUserSettings(userId),
@@ -297,7 +299,9 @@ export default function Home() {
     const today = todayStr();
     await db.logWorkingHours(workspace.id, user.id, userSettings.name || user.email || "", today, hours);
     const thisMonth = today.substring(0, 7);
-    const updated = await db.getWorkingHours(workspace.id, `${thisMonth}-01`, `${thisMonth}-31`);
+    const now2 = new Date();
+    const lastDay2 = new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate();
+    const updated = await db.getWorkingHours(workspace.id, `${thisMonth}-01`, `${thisMonth}-${String(lastDay2).padStart(2, "0")}`);
     setWorkingHours(updated);
   }
 
@@ -349,7 +353,6 @@ export default function Home() {
   ).length;
   const todayNextCount = currentList?.companies.filter((c) => c.nextDate === today).length ?? 0;
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
-  const followCount = allCompanies.filter((c) => c.nextDate && c.nextDate <= today).length;
 
   // 認証チェック中
   if (!authChecked) return null;
@@ -474,66 +477,6 @@ export default function Home() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            )}
-            {/* 今日のTODO（リスト別） */}
-            {followCount > 0 && (
-              <div className="mb-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-bold text-slate-800">今日のTODO</span>
-                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold">{followCount}件</span>
-                </div>
-                <div className="space-y-2">
-                  {lists.map((list) => {
-                    const todoCompanies = list.companies
-                      .filter((c) => c.nextDate && c.nextDate <= today)
-                      .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
-                    if (todoCompanies.length === 0) return null;
-                    return (
-                      <div key={list.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                          <span className="text-xs font-semibold text-slate-700">{list.industry || list.name}</span>
-                          <span className="text-xs text-slate-400">{todoCompanies.length}件</span>
-                        </div>
-                        <div className="divide-y divide-slate-50">
-                          {todoCompanies.map((c) => {
-                            const isOverdue = c.nextDate < today;
-                            return (
-                              <div
-                                key={c.id}
-                                onClick={() => {
-                                  setSelectedListId(list.id);
-                                  setFilterResult("すべて");
-                                  setSearch("");
-                                  setTimeout(() => {
-                                    const sorted = [...list.companies].sort((a, b) => {
-                                      const aT = a.nextDate === today ? -1 : 0;
-                                      const bT = b.nextDate === today ? -1 : 0;
-                                      return aT - bT;
-                                    });
-                                    const idx = sorted.findIndex((lc) => lc.id === c.id);
-                                    if (idx !== -1) setSelectedIndex(idx);
-                                  }, 50);
-                                }}
-                                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors group"
-                              >
-                                <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${isOverdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
-                                  {isOverdue ? "超過" : "今日"}
-                                </span>
-                                <span className="font-medium text-slate-800 flex-1 min-w-0 truncate text-sm">{c.company}</span>
-                                <span className="text-xs text-slate-400 shrink-0 hidden sm:block">{c.nextDate}</span>
-                                {c.latestResult && (
-                                  <span className={`px-2 py-0.5 rounded-full text-xs shrink-0 hidden sm:block ${RESULT_CONFIG[c.latestResult].badge}`}>{c.latestResult}</span>
-                                )}
-                                <span className="text-xs text-violet-600 font-semibold shrink-0 group-hover:underline">コール →</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
             )}

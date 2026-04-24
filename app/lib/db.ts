@@ -28,7 +28,7 @@ export async function getMyWorkspace(userId: string): Promise<Workspace | null> 
     .select("workspace_id, workspaces(id, name, owner_id)")
     .eq("user_id", userId)
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (!data?.workspaces) return null;
   const w = data.workspaces as unknown as { id: string; name: string; owner_id: string };
@@ -57,13 +57,23 @@ export async function createWorkspace(userId: string, name: string): Promise<Wor
 }
 
 export async function getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  const { data } = await supabase
+  const { data: members } = await supabase
     .from("workspace_members")
-    .select("user_id, role, profiles(name, email)")
+    .select("user_id, role")
     .eq("workspace_id", workspaceId);
 
-  return (data || []).map((m) => {
-    const p = m.profiles as unknown as { name: string; email: string } | null;
+  if (!members || members.length === 0) return [];
+
+  const userIds = members.map((m) => m.user_id);
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, name, email")
+    .in("id", userIds);
+
+  const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+  return members.map((m) => {
+    const p = profileMap.get(m.user_id);
     return {
       userId: m.user_id,
       role: m.role,
@@ -118,7 +128,7 @@ export async function loadUserSettings(userId: string): Promise<UserSettings | n
     .from("profiles")
     .select("*")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (!data) return null;
   return {
@@ -153,7 +163,7 @@ export async function loadTagConfig(userId: string): Promise<TagConfig | null> {
     .from("tag_configs")
     .select("*")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (!data) return null;
   return {
@@ -181,7 +191,7 @@ export async function loadGoalConfig(userId: string): Promise<GoalConfig | null>
     .from("goal_configs")
     .select("*")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (!data) return null;
   return {
