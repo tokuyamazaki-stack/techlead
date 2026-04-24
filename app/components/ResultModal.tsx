@@ -167,6 +167,14 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   function logResult() {
     if (!selectedResult) return;
 
+    // 再コール・資料送付で次回連絡日が未入力なら自動で7日後をセット
+    let finalNextDate = nextDate;
+    if ((selectedResult === "再コール" || selectedResult === "資料送付") && !nextDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      finalNextDate = d.toISOString().split("T")[0];
+    }
+
     const record: CallRecord = {
       id: `${Date.now()}`,
       date: today(),
@@ -183,7 +191,7 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
       ...company,
       latestResult: selectedResult,
       assignee,
-      nextDate,
+      nextDate: finalNextDate,
       contactName,
       directPhone,
       contactEmail,

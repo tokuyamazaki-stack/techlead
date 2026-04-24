@@ -10,6 +10,7 @@ import DailyReport from "./components/DailyReport";
 import ProgressTab from "./components/ProgressTab";
 import StrategyTab from "./components/StrategyTab";
 import ReviewTab from "./components/ReviewTab";
+import FollowTab from "./components/FollowTab";
 import AuthModal from "./components/AuthModal";
 import WorkspaceSetup from "./components/WorkspaceSetup";
 import { DEMO_LISTS, DEMO_USER, DEMO_GOALS } from "./lib/demoData";
@@ -312,6 +313,7 @@ export default function Home() {
   ).length;
   const todayNextCount = currentList?.companies.filter((c) => c.nextDate === today).length ?? 0;
   const appoCount = currentList?.companies.filter((c) => c.latestResult === "アポ獲得").length ?? 0;
+  const followCount = allCompanies.filter((c) => c.nextDate && c.nextDate <= today).length;
 
   // 認証チェック中
   if (!authChecked) return null;
@@ -348,6 +350,7 @@ export default function Home() {
         <div className="flex gap-0.5 md:gap-1 bg-slate-100 rounded-xl p-1">
           {[
             { id: "list" as Tab, label: "リスト", labelFull: "コールリスト" },
+            { id: "follow" as Tab, label: `フォロー${followCount > 0 ? `(${followCount})` : ""}`, labelFull: `フォロー${followCount > 0 ? ` (${followCount})` : ""}` },
             { id: "report" as Tab, label: `日報${todayCallCount > 0 ? `(${todayCallCount})` : ""}`, labelFull: `日報${todayCallCount > 0 ? ` (${todayCallCount})` : ""}` },
             { id: "review" as Tab, label: "振り返り", labelFull: "振り返り" },
             { id: "progress" as Tab, label: "進捗", labelFull: "進捗" },
@@ -388,6 +391,32 @@ export default function Home() {
       </header>
 
       <div className="px-4 md:px-8 py-4 md:py-6 max-w-7xl mx-auto">
+        {tab === "follow" && (
+          <FollowTab
+            lists={lists}
+            today={today}
+            onOpen={(company) => {
+              const list = lists.find((l) => l.companies.some((c) => c.id === company.id));
+              if (list) {
+                // フィルターをリセットしてリストタブへ
+                setSelectedListId(list.id);
+                setFilterResult("すべて");
+                setSearch("");
+                setTab("list");
+                // フィルターリセット後のfiltered配列での位置を計算
+                setTimeout(() => {
+                  const sorted = [...list.companies].sort((a, b) => {
+                    const aT = a.nextDate === today ? -1 : 0;
+                    const bT = b.nextDate === today ? -1 : 0;
+                    return aT - bT;
+                  });
+                  const idx = sorted.findIndex((c) => c.id === company.id);
+                  if (idx !== -1) setSelectedIndex(idx);
+                }, 50);
+              }
+            }}
+          />
+        )}
         {tab === "list" && (
           <>
             {lists.length === 0 ? (
