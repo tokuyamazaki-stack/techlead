@@ -618,6 +618,7 @@ export default function Home() {
                             <th className="text-left px-4 py-3 font-semibold">従業員数</th>
                             <th className="text-left px-4 py-3 font-semibold">売上</th>
                             <th className="text-left px-4 py-3 font-semibold">住所</th>
+                            <th className="text-left px-4 py-3 font-semibold">担当</th>
                             <th className="text-left px-4 py-3 font-semibold">結果</th>
                             <th className="text-left px-4 py-3 font-semibold">次回連絡日</th>
                           </tr>
@@ -669,6 +670,13 @@ export default function Home() {
                                 <td className="px-4 py-3.5 text-slate-400 text-xs">{company.employees || "—"}</td>
                                 <td className="px-4 py-3.5 text-slate-400 text-xs">{company.revenue || "—"}</td>
                                 <td className="px-4 py-3.5 text-slate-400 text-xs max-w-[160px] truncate" title={company.address}>{company.address || "—"}</td>
+                                <td className="px-4 py-3.5">
+                                  {company.assignee ? (
+                                    <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{company.assignee}</span>
+                                  ) : (
+                                    <span className="text-slate-300 text-xs">—</span>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3.5 whitespace-nowrap">
                                   {company.latestResult ? (
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${RESULT_CONFIG[company.latestResult].badge}`}>
