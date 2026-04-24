@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/daily-submit",
-      "schedule": "30 9 * * 1-5"
+      "schedule": "0 9 * * 1-5"
     }
   ]
 }

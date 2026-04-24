@@ -90,8 +90,14 @@ async function submitForUser(
   }
 
   const rows = records ?? [];
-  const count = (result: string) => rows.filter((r) => r.result === result).length;
   const totalCalls = rows.length;
+
+  // 当日コールが0件なら送信しない（シフトなし・休日対応）
+  if (totalCalls === 0) {
+    return { ...base, status: "skipped", reason: "no calls today" };
+  }
+
+  const count = (result: string) => rows.filter((r) => r.result === result).length;
   const appo = count("アポ獲得");
   const material = count("資料送付");
   const recall = count("再コール");
