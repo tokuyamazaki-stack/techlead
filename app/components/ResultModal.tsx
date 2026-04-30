@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { Company, ResultType, CallRecord, TagConfig, UserSettings } from "../lib/types";
 import * as db from "../lib/db";
 import { RESULTS, RESULT_CONFIG, DETAIL_RESULTS, DEFAULT_TAGS, NG_REASONS } from "../lib/types";
 import { today } from "../lib/parser";
 import { addBusinessDays } from "../lib/dateUtils";
+import type { AiCallResult } from "../api/twilio/recording/route";
 
 interface Props {
   company: Company;
@@ -136,6 +137,12 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"call" | "info">("call");
 
+  // AI録音
+  const [aiStatus, setAiStatus] = useState<"idle" | "starting" | "waiting" | "transcribing" | "done" | "error">("idle");
+  const [bridgeNumber, setBridgeNumber] = useState<string | null>(null);
+  const [conferenceId, setConferenceId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // リアルタイム架電状況の登録・解除
   useEffect(() => {
     if (!workspaceId || !userId) return;
@@ -160,6 +167,53 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
     if (diff < -60 && hasPrev && onPrev) onPrev();
     touchStartX.current = null;
   }
+
+  const applyAiResult = useCallback((ai: AiCallResult) => {
+    if (ai.result) setSelectedResult(ai.result);
+    if (ai.memo) setMemo(ai.memo);
+    if (ai.products?.length) setSelectedProducts(ai.products);
+    if (ai.challenges?.length) setSelectedChallenges(ai.challenges);
+    if (ai.interests?.length) setSelectedInterests(ai.interests);
+    if (ai.ngReason) setNgReason(ai.ngReason);
+  }, []);
+
+  async function startAiRecording() {
+    setAiStatus("starting");
+    try {
+      const res = await fetch("/api/twilio/bridge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: company.id,
+          userId: userId ?? "unknown",
+          workspaceId: workspaceId ?? "unknown",
+        }),
+      });
+      const data = await res.json();
+      setBridgeNumber(data.bridgeNumber);
+      setConferenceId(data.conferenceId);
+      setAiStatus("waiting");
+
+      pollRef.current = setInterval(async () => {
+        const r = await fetch(`/api/twilio/status?id=${data.conferenceId}`);
+        const s = await r.json();
+        if (s.status === "transcribing") setAiStatus("transcribing");
+        if (s.status === "done") {
+          clearInterval(pollRef.current!);
+          setAiStatus("done");
+          applyAiResult(s.ai_result as AiCallResult);
+        }
+        if (s.status === "error") {
+          clearInterval(pollRef.current!);
+          setAiStatus("error");
+        }
+      }, 3000);
+    } catch {
+      setAiStatus("error");
+    }
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const showDetailTags = selectedResult && DETAIL_RESULTS.includes(selectedResult);
   const isNgResult = selectedResult === "担当NG" || selectedResult === "受付NG";
@@ -328,6 +382,49 @@ export default function ResultModal({ company, tagConfig, userSettings, onSave, 
             </div>
           ) : tab === "call" ? (
             <>
+              {/* AI録音ブロック */}
+              <div className="mb-5">
+                {aiStatus === "idle" && (
+                  <button
+                    onClick={startAiRecording}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all"
+                  >
+                    🎙️ AI録音で自動入力
+                  </button>
+                )}
+                {aiStatus === "starting" && (
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm bg-slate-100 text-slate-500 border border-slate-200">
+                    <span className="animate-spin">⟳</span> ブリッジ準備中...
+                  </div>
+                )}
+                {(aiStatus === "waiting") && bridgeNumber && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                    <p className="text-xs text-indigo-600 font-semibold mb-2">📞 以下の手順で通話を開始してください</p>
+                    <ol className="text-sm text-slate-700 space-y-1 list-decimal list-inside mb-3">
+                      <li>顧客に電話をかける</li>
+                      <li>通話中に「通話を追加」→ <span className="font-mono font-bold text-indigo-700">{bridgeNumber}</span> に発信</li>
+                      <li>「通話を合流」をタップ</li>
+                    </ol>
+                    <p className="text-xs text-slate-400">通話終了後、自動で文字起こし・入力が始まります</p>
+                  </div>
+                )}
+                {aiStatus === "transcribing" && (
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="animate-spin">⟳</span> AIが文字起こし・分析中...
+                  </div>
+                )}
+                {aiStatus === "done" && (
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                    ✓ AI自動入力完了。内容を確認して保存してください
+                  </div>
+                )}
+                {aiStatus === "error" && (
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm bg-red-50 text-red-600 border border-red-200">
+                    エラーが発生しました。手動で入力してください
+                  </div>
+                )}
+              </div>
+
               {/* 結果ボタン */}
               <div className="mb-5">
                 <label className="text-xs text-slate-500 mb-2.5 block">今日の結果を選択</label>

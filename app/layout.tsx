@@ -35,17 +35,8 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-slate-50">
         {children}
-        <footer className="border-t border-slate-200 bg-white mt-auto py-4 px-4 md:px-8">
-          <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-400">
-            <span>© 2026 TechLead</span>
-            <div className="flex gap-4">
-              <a href="/terms" className="hover:text-violet-600 transition-colors">利用規約</a>
-              <a href="/privacy" className="hover:text-violet-600 transition-colors">プライバシーポリシー</a>
-            </div>
-          </div>
-        </footer>
       </body>
     </html>
   );
