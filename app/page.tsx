@@ -851,7 +851,7 @@ export default function Home() {
                           )}
 
                           {/* フィルターバー：折りたたみ可能 */}
-                          <div className="sticky top-0 z-10 bg-slate-50 pb-1">
+                          <div className="pb-1">
                             <div className="flex items-center gap-2">
                               <div className={`flex gap-1.5 overflow-x-auto pb-1 flex-1 transition-all duration-200 ${filterBarOpen ? "" : "hidden"}`} style={{ scrollbarWidth: "none" }}>
                                 {FILTER_OPTIONS.map((f) => (
