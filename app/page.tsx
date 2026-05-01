@@ -127,6 +127,11 @@ export default function Home() {
   const [activeCalls, setActiveCalls] = useState<ActiveCallInfo[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHoursRecord[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [followModal, setFollowModal] = useState<{
+    company: import("./lib/types").Company;
+    list: import("./lib/types").CallList;
+    allItems: Array<{company: import("./lib/types").Company, list: import("./lib/types").CallList}>;
+  } | null>(null);
 
   // 認証状態の監視
   useEffect(() => {
@@ -1088,11 +1093,8 @@ export default function Home() {
               <FollowTab
                 lists={lists}
                 today={today}
-                onOpen={(company, list) => {
-                  setSelectedListId(list.id);
-                  const idx = list.companies.findIndex((c) => c.id === company.id);
-                  setSelectedIndex(idx >= 0 ? idx : null);
-                  setTab("list");
+                onOpen={(company, list, allItems) => {
+                  setFollowModal({ company, list, allItems });
                 }}
               />
             )}
@@ -1193,6 +1195,38 @@ export default function Home() {
           userId={user?.id}
         />
       )}
+
+      {followModal && (() => {
+        const { company, list, allItems } = followModal;
+        const idx = allItems.findIndex((i) => i.company.id === company.id);
+        return (
+          <ResultModal
+            key={company.id}
+            company={company}
+            tagConfig={tagConfig}
+            userSettings={userSettings}
+            onSave={(updated) => {
+              handleSaveResult(updated);
+              const newItems = allItems.map((i) => i.company.id === updated.id ? { ...i, company: updated } : i);
+              if (idx < newItems.length - 1) {
+                setFollowModal({ ...followModal, company: newItems[idx + 1].company, list: newItems[idx + 1].list, allItems: newItems });
+              } else {
+                setFollowModal(null);
+              }
+            }}
+            onUpdateTags={handleUpdateTags}
+            onClose={() => setFollowModal(null)}
+            currentIndex={idx}
+            totalCount={allItems.length}
+            hasPrev={idx > 0}
+            hasNext={idx < allItems.length - 1}
+            onPrev={() => setFollowModal({ ...followModal, company: allItems[idx - 1].company, list: allItems[idx - 1].list })}
+            onNext={() => setFollowModal({ ...followModal, company: allItems[idx + 1].company, list: allItems[idx + 1].list })}
+            workspaceId={workspace?.id}
+            userId={user?.id}
+          />
+        );
+      })()}
     </div>
   );
 }

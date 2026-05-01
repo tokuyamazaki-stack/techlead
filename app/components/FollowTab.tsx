@@ -14,7 +14,7 @@ interface FollowItem {
 interface Props {
   lists: CallList[];
   today: string;
-  onOpen: (company: Company, list: CallList) => void;
+  onOpen: (company: Company, list: CallList, allItems: Array<{company: Company, list: CallList}>) => void;
 }
 
 function urgencyOrder(u: FollowItem["urgency"]) {
@@ -31,6 +31,8 @@ export default function FollowTab({ lists, today, onOpen }: Props) {
       return next;
     });
   }
+
+  const allFollowItems: Array<{company: Company, list: CallList}> = [];
 
   const grouped = lists.map((list) => {
     const items: FollowItem[] = list.companies
@@ -54,6 +56,10 @@ export default function FollowTab({ lists, today, onOpen }: Props) {
       });
     return { list, items };
   }).filter((g) => g.items.length > 0);
+
+  grouped.forEach(({ list, items }) => {
+    items.forEach(({ company }) => allFollowItems.push({ company, list }));
+  });
 
   const totalFollow  = grouped.reduce((s, g) => s + g.items.length, 0);
   const totalOverdue = grouped.reduce((s, g) => s + g.items.filter((i) => i.urgency === "overdue").length, 0);
@@ -149,7 +155,7 @@ export default function FollowTab({ lists, today, onOpen }: Props) {
                             className={`border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer last:border-none ${
                               urgency === "overdue" ? "bg-red-50/30" : ""
                             }`}
-                            onClick={() => onOpen(c, list)}
+                            onClick={() => onOpen(c, list, allFollowItems)}
                           >
                             <td className="px-4 py-3">
                               <div className="font-medium text-slate-900">{c.company}</div>
@@ -180,7 +186,7 @@ export default function FollowTab({ lists, today, onOpen }: Props) {
                             <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{c.assignee || "—"}</td>
                             <td className="px-4 py-3 text-right">
                               <button
-                                onClick={(e) => { e.stopPropagation(); onOpen(c, list); }}
+                                onClick={(e) => { e.stopPropagation(); onOpen(c, list, allFollowItems); }}
                                 className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-semibold transition-all"
                               >
                                 コール
