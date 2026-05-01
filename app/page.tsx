@@ -461,7 +461,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── ダークサイドバー（デスクトップのみ） ── */}
-        <aside className={`hidden md:flex flex-col bg-slate-900 shrink-0 sticky top-0 h-screen z-40 transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-60"}`}>
+        <aside className={`hidden md:flex flex-col bg-slate-900 shrink-0 sticky top-0 h-screen z-40 transition-all duration-300 shadow-[4px_0_24px_rgba(0,0,0,0.35)] ${sidebarCollapsed ? "w-16" : "w-60"}`}>
           {/* ロゴ + トグルボタン */}
           <div className={`px-3 py-5 border-b border-slate-800 flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
             {!sidebarCollapsed && (
