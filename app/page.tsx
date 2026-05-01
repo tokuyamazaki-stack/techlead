@@ -122,9 +122,11 @@ export default function Home() {
   const [editingName, setEditingName] = useState("");
   const [search, setSearch] = useState("");
   const [filterResult, setFilterResult] = useState<string>("すべて");
+  const [filterBarOpen, setFilterBarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<ActiveCallInfo[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHoursRecord[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // 認証状態の監視
   useEffect(() => {
@@ -459,22 +461,40 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── ダークサイドバー（デスクトップのみ） ── */}
-        <aside className="hidden md:flex flex-col w-60 bg-slate-900 shrink-0 sticky top-0 h-screen z-40">
-          {/* ロゴ */}
-          <div className="px-5 py-6 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-violet-500/40 shrink-0">
+        <aside className={`hidden md:flex flex-col bg-slate-900 shrink-0 sticky top-0 h-screen z-40 transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-60"}`}>
+          {/* ロゴ + トグルボタン */}
+          <div className={`px-3 py-5 border-b border-slate-800 flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-violet-500/40 shrink-0">
+                  TL
+                </div>
+                <div>
+                  <div className="text-white font-bold text-base tracking-tight leading-none">TechLead</div>
+                  <div className="text-slate-500 text-[10px] mt-0.5 tracking-wide">Inside Sales</div>
+                </div>
+              </div>
+            )}
+            {sidebarCollapsed && (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-violet-500/40">
                 TL
               </div>
-              <div>
-                <div className="text-white font-bold text-base tracking-tight leading-none">TechLead</div>
-                <div className="text-slate-500 text-[10px] mt-0.5 tracking-wide">Inside Sales</div>
-              </div>
-            </div>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className={`text-slate-500 hover:text-white transition-all p-1.5 rounded-lg hover:bg-slate-800 ${sidebarCollapsed ? "mt-3 mx-auto" : ""}`}
+              title={sidebarCollapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {sidebarCollapsed
+                  ? <path d="M9 18l6-6-6-6" />
+                  : <path d="M15 18l-6-6 6-6" />}
+              </svg>
+            </button>
           </div>
 
           {/* ナビゲーション */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             {NAV_ITEMS.map((item) => {
               const isActive = tab === item.id;
               const badge = item.id === "follow" && followCount > 0 ? followCount : null;
@@ -482,7 +502,10 @@ export default function Home() {
                 <button
                   key={item.id}
                   onClick={() => setTab(item.id)}
+                  title={sidebarCollapsed ? item.label : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative ${
+                    sidebarCollapsed ? "justify-center" : ""
+                  } ${
                     isActive
                       ? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
                       : "text-slate-400 hover:bg-slate-800 hover:text-white"
@@ -491,13 +514,16 @@ export default function Home() {
                   <span className={`shrink-0 ${isActive ? "text-white" : "text-slate-500 group-hover:text-violet-400"}`}>
                     {item.icon}
                   </span>
-                  <span>{item.label}</span>
-                  {badge && (
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                  {!sidebarCollapsed && badge && (
                     <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       isActive ? "bg-white/20 text-white" : "bg-violet-500/20 text-violet-400"
                     }`}>
                       {badge}
                     </span>
+                  )}
+                  {sidebarCollapsed && badge && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-violet-400" />
                   )}
                 </button>
               );
@@ -505,34 +531,42 @@ export default function Home() {
           </nav>
 
           {/* ユーザー + アクション */}
-          <div className="px-3 py-4 border-t border-slate-800 space-y-2">
+          <div className="px-2 py-4 border-t border-slate-800 space-y-2">
             <button
               onClick={() => setShowImport(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-violet-600/30"
+              title={sidebarCollapsed ? "リストを取込" : undefined}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-violet-600/30 ${sidebarCollapsed ? "justify-center" : "justify-center"}`}
             >
               <span className="text-base leading-none">＋</span>
-              <span>リストを取込</span>
+              {!sidebarCollapsed && <span>リストを取込</span>}
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+              title={sidebarCollapsed ? (userSettings.name || "設定") : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all ${sidebarCollapsed ? "justify-center" : ""}`}
             >
               <span className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
                 {userSettings.name ? userSettings.name[0] : "?"}
               </span>
-              <span className="text-slate-300 text-xs truncate flex-1 text-left">
-                {userSettings.name || "名前を設定"}
-              </span>
-              <svg className="w-4 h-4 text-slate-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
+              {!sidebarCollapsed && (
+                <>
+                  <span className="text-slate-300 text-xs truncate flex-1 text-left">
+                    {userSettings.name || "名前を設定"}
+                  </span>
+                  <svg className="w-4 h-4 text-slate-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </>
+              )}
             </button>
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-3 py-2 text-slate-600 hover:text-slate-400 text-xs rounded-lg hover:bg-slate-800/50 transition-all"
-            >
-              ログアウト
-            </button>
+            {!sidebarCollapsed && (
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 text-slate-600 hover:text-slate-400 text-xs rounded-lg hover:bg-slate-800/50 transition-all"
+              >
+                ログアウト
+              </button>
+            )}
           </div>
         </aside>
 
@@ -816,34 +850,55 @@ export default function Home() {
                             </div>
                           )}
 
-                          {/* フィルターバー：横スクロール */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: "none" }}>
-                              {FILTER_OPTIONS.map((f) => (
-                                <button key={f} onClick={() => setFilterResult(f)}
-                                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
-                                    filterResult === f
-                                      ? "bg-slate-900 text-white shadow-sm"
-                                      : f === "本日ネクスト" && todayNextCount > 0
-                                      ? "bg-violet-100 text-violet-700 border border-violet-200"
-                                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                  }`}>
-                                  {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
-                                </button>
-                              ))}
-                            </div>
-                            {assigneeOptions.length > 0 && (
-                              <select
-                                value={filterAssignee}
-                                onChange={(e) => setFilterAssignee(e.target.value)}
-                                className="shrink-0 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-600 focus:outline-none focus:border-violet-400 transition-all cursor-pointer shadow-sm"
-                              >
-                                <option value="すべて">担当：全員</option>
-                                {assigneeOptions.map(a => (
-                                  <option key={a} value={a}>{a}</option>
+                          {/* フィルターバー：折りたたみ可能 */}
+                          <div className="sticky top-0 z-10 bg-slate-50 pb-1">
+                            <div className="flex items-center gap-2">
+                              <div className={`flex gap-1.5 overflow-x-auto pb-1 flex-1 transition-all duration-200 ${filterBarOpen ? "" : "hidden"}`} style={{ scrollbarWidth: "none" }}>
+                                {FILTER_OPTIONS.map((f) => (
+                                  <button key={f} onClick={() => setFilterResult(f)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
+                                      filterResult === f
+                                        ? "bg-slate-900 text-white shadow-sm"
+                                        : f === "本日ネクスト" && todayNextCount > 0
+                                        ? "bg-violet-100 text-violet-700 border border-violet-200"
+                                        : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                    }`}>
+                                    {f}{f === "本日ネクスト" && todayNextCount > 0 ? ` ${todayNextCount}` : ""}
+                                  </button>
                                 ))}
-                              </select>
-                            )}
+                              </div>
+                              {!filterBarOpen && (
+                                <div className="flex-1 flex items-center gap-2">
+                                  <span className="text-xs text-slate-500">
+                                    絞込：<span className="font-semibold text-slate-800">{filterResult}</span>
+                                    {filterResult !== "すべて" && (
+                                      <button onClick={() => setFilterResult("すべて")} className="ml-1.5 text-slate-400 hover:text-slate-600">✕</button>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {assigneeOptions.length > 0 && filterBarOpen && (
+                                <select
+                                  value={filterAssignee}
+                                  onChange={(e) => setFilterAssignee(e.target.value)}
+                                  className="shrink-0 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-600 focus:outline-none focus:border-violet-400 transition-all cursor-pointer shadow-sm"
+                                >
+                                  <option value="すべて">担当：全員</option>
+                                  {assigneeOptions.map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                onClick={() => setFilterBarOpen(!filterBarOpen)}
+                                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition-all shadow-sm"
+                                title={filterBarOpen ? "フィルターを閉じる" : "フィルターを開く"}
+                              >
+                                <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${filterBarOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
                         </div>
 
