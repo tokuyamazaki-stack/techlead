@@ -803,18 +803,16 @@ export default function Home() {
                           ].map((s) => (
                             <div
                               key={s.label}
-                              className={`rounded-2xl p-4 md:p-5 bg-gradient-to-br ${s.gradient} shadow-sm relative overflow-hidden`}
+                              className={`rounded-xl px-4 py-3 bg-gradient-to-br ${s.gradient} shadow-sm relative overflow-hidden flex items-center gap-3`}
                             >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.iconBg} ${s.textColor}`}>
-                                  {s.icon}
-                                </div>
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${s.iconBg} ${s.textColor}`}>
+                                {s.icon}
                               </div>
-                              <div className={`text-3xl md:text-4xl font-bold tracking-tight ${s.textColor}`}>{s.value}</div>
-                              <div className={`text-xs mt-1 font-medium ${s.subColor}`}>{s.label}</div>
-                              {/* 装飾的な円 */}
-                              <div className="absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
-                              <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-white/5 pointer-events-none" />
+                              <div>
+                                <div className={`text-2xl font-bold tracking-tight leading-none ${s.textColor}`}>{s.value}</div>
+                                <div className={`text-[11px] mt-0.5 font-medium ${s.subColor}`}>{s.label}</div>
+                              </div>
+                              <div className="absolute -bottom-3 -right-3 w-14 h-14 rounded-full bg-white/5 pointer-events-none" />
                             </div>
                           ))}
                         </div>
