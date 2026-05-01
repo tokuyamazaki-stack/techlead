@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechLead — 機能紹介</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif; background: #0a0f1e; color: #fff; -webkit-font-smoothing: antialiased; }
+
+  /* ヘッダー */
+  .hero { background: linear-gradient(135deg, #0a0f1e 0%, #0f2744 60%, #1a1060 100%); padding: 64px 24px 56px; text-align: center; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 60% 40%, rgba(56,189,248,0.08) 0%, transparent 70%); }
+  .hero-eyebrow { font-size: 11px; color: #38bdf8; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 20px; }
+  .hero-logo { font-size: 64px; font-weight: 900; background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; margin-bottom: 20px; }
+  .hero-tagline { font-size: 18px; color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; }
+  .hero-tagline strong { color: #fff; }
+  .hero-sub { font-size: 13px; color: #64748b; }
+
+  /* セクション共通 */
+  section { padding: 48px 24px; }
+  section + section { border-top: 1px solid rgba(255,255,255,0.06); }
+  .section-label { font-size: 11px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+  .section-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 8px; }
+  .section-desc { font-size: 14px; color: #94a3b8; line-height: 1.8; margin-bottom: 28px; }
+
+  /* 課題セクション */
+  .pain-section { background: #0a0f1e; }
+  .pain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pain-card { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2); border-radius: 12px; padding: 18px 16px; }
+  .pain-icon { font-size: 22px; margin-bottom: 8px; }
+  .pain-card h3 { font-size: 13px; color: #fca5a5; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
+  .pain-card p { font-size: 12px; color: #64748b; line-height: 1.6; }
+
+  /* 機能カード */
+  .features-section { background: #0a0f1e; }
+  .feature-list { display: flex; flex-direction: column; gap: 14px; }
+  .feature-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; display: flex; gap: 16px; align-items: flex-start; }
+  .feature-card.highlight { background: rgba(56,189,248,0.06); border-color: rgba(56,189,248,0.2); }
+  .feature-icon { font-size: 28px; flex-shrink: 0; margin-top: 2px; }
+  .feature-content h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #e2e8f0; }
+  .feature-content p { font-size: 13px; color: #94a3b8; line-height: 1.7; }
+  .feature-tag { display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .tag-live { background: rgba(16,185,129,0.15); color: #10b981; }
+  .tag-soon { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .tag-future { background: rgba(139,92,246,0.15); color: #a78bfa; }
+
+  /* ビジョンセクション */
+  .vision-section { background: linear-gradient(135deg, #0f1f38 0%, #150f30 100%); }
+  .vision-box { background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; padding: 28px 24px; margin-bottom: 24px; text-align: center; }
+  .vision-box .quote { font-size: 20px; font-weight: 800; color: #fff; line-height: 1.5; margin-bottom: 12px; }
+  .vision-box .quote span { background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .vision-box p { font-size: 13px; color: #94a3b8; line-height: 1.7; }
+
+  /* ロードマップ */
+  .roadmap-section { background: #0a0f1e; }
+  .roadmap-list { display: flex; flex-direction: column; gap: 0; position: relative; }
+  .roadmap-list::before { content: ''; position: absolute; left: 19px; top: 24px; bottom: 24px; width: 2px; background: linear-gradient(to bottom, #38bdf8, #818cf8, rgba(139,92,246,0.2)); }
+  .roadmap-item { display: flex; gap: 20px; align-items: flex-start; padding: 0 0 28px; position: relative; }
+  .roadmap-item:last-child { padding-bottom: 0; }
+  .roadmap-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; z-index: 1; }
+  .dot-active { background: linear-gradient(135deg, #0ea5e9, #6366f1); box-shadow: 0 0 16px rgba(56,189,248,0.4); }
+  .dot-next { background: rgba(245,158,11,0.15); border: 2px solid rgba(245,158,11,0.4); }
+  .dot-future { background: rgba(139,92,246,0.1); border: 2px solid rgba(139,92,246,0.3); }
+  .roadmap-content { padding-top: 8px; }
+  .roadmap-content .phase { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+  .roadmap-content h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .roadmap-content p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+
+  /* 比較表 */
+  .compare-section { background: #0a0f1e; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .compare-table th { padding: 10px 8px; text-align: center; color: #64748b; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .compare-table th.us { color: #38bdf8; }
+  .compare-table td { padding: 12px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #94a3b8; }
+  .compare-table td:first-child { color: #e2e8f0; font-size: 12px; }
+  .compare-table td { text-align: center; }
+  .compare-table td:first-child { text-align: left; }
+  .check { color: #10b981; font-size: 16px; }
+  .cross { color: #475569; font-size: 14px; }
+  .partial { color: #fbbf24; font-size: 12px; }
+  .highlight-col { background: rgba(56,189,248,0.04); }
+
+  /* CTAセクション */
+  .cta-section { background: linear-gradient(135deg, #0f2744 0%, #150f30 100%); text-align: center; padding: 56px 24px; }
+  .cta-section h2 { font-size: 22px; font-weight: 800; margin-bottom: 12px; line-height: 1.4; }
+  .cta-section p { font-size: 14px; color: #94a3b8; line-height: 1.8; margin-bottom: 28px; }
+  .cta-btn { display: inline-block; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 999px; text-decoration: none; }
+  .cta-url { display: block; margin-top: 14px; font-size: 12px; color: #38bdf8; word-break: break-all; }
+
+  /* フッター */
+  footer { padding: 24px; text-align: center; font-size: 12px; color: #334155; border-top: 1px solid rgba(255,255,255,0.05); }
+
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #0a0f1e !important; color: #fff !important; }
+    .hero { background: #0f2744 !important; padding: 40px 24px 32px; }
+    .hero-logo { font-size: 48px; }
+    section { padding: 28px 24px; page-break-inside: avoid; }
+    .pain-grid { grid-template-columns: 1fr 1fr; }
+    .feature-card { break-inside: avoid; }
+    .roadmap-item { break-inside: avoid; }
+    .cta-btn { background: #0ea5e9 !important; }
+    .cta-section { padding: 36px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ヒーロー -->
+<div class="hero">
+  <div class="hero-eyebrow">Inside Sales AI Platform</div>
+  <div class="hero-logo">TechLead</div>
+  <div class="hero-tagline">
+    <strong>属人化された営業スタイルを、<br>チームの武器に変える。</strong>
+  </div>
+  <div class="hero-sub">株式会社TechLead — 2026</div>
+</div>
+
+<!-- 課題 -->
+<section class="pain-section">
+  <div class="section-label">Problem</div>
+  <div class="section-title">日本のインサイドセールスの現実</div>
+  <div class="section-desc">なぜ、優秀な営業がいてもチームは育たないのか。</div>
+  <div class="pain-grid">
+    <div class="pain-card">
+      <div class="pain-icon">📋</div>
+      <h3>日報が手作業</h3>
+      <p>架電数・結果を毎日手入力。ムダな時間が積み重なる。</p>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">🧠</div>
+      <h3>ノウハウが属人化</h3>
+      <p>トップ営業のやり方が言語化されていない。真似できない。</p>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">📉</div>
+      <h3>リスト管理が非効率</h3>
+      <p>どのリストを続けるべきか、感覚で判断している。</p>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">👶</div>
+      <h3>新人育成に時間がかかる</h3>
+      <p>一人前になるまで3〜6ヶ月。マネージャーの負担も大きい。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 現在の機能 -->
+<section class="features-section">
+  <div class="section-label">現在の機能</div>
+  <div class="section-title">TechLeadで<br>できること</div>
+  <div class="section-desc">インサイドセールスに必要なものを、一つにまとめた。</div>
+  <div class="feature-list">
+
+    <div class="feature-card highlight">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-content">
+        <h3>AI通話録音 → 自動入力</h3>
+        <p>通話が終わった瞬間に、AIが会話を文字起こし。結果・メモ・課題・興味が自動で入力される。入力作業はゼロ。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-content">
+        <h3>架電リスト管理</h3>
+        <p>Sansanのデータをコピペするだけでリストが作れる。AIが会社情報を自動抽出。フォローすべき企業も自動で整理。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🧠</div>
+      <div class="feature-content">
+        <h3>AIリスト戦略分析</h3>
+        <p>「このリストを続けるべきか？」をAIが判断。アポ率・架電数・NG傾向からA〜Dのグレードで評価。撤退の判断を数字でできる。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📈</div>
+      <div class="feature-content">
+        <h3>チーム進捗ダッシュボード</h3>
+        <p>個人・チームの架電数・アポ率・推移をリアルタイムで確認。目標設定もできる。日報の集計は自動。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📝</div>
+      <div class="feature-content">
+        <h3>トークスクリプト管理</h3>
+        <p>架電中に画面でスクリプトを確認できる。複数パターンを登録して使い分け可能。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📅</div>
+      <div class="feature-content">
+        <h3>日報自動生成</h3>
+        <p>架電データからGoogle Formに自動入力。毎日の日報作業が1クリックで終わる。</p>
+        <span class="feature-tag tag-live">実装済み</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ビジョン -->
+<section class="vision-section">
+  <div class="section-label">Vision</div>
+  <div class="section-title">TechLeadが<br>目指す世界</div>
+  <div class="vision-box">
+    <div class="quote">
+      <span>使うだけで、<br>チーム全体が強くなる。</span>
+    </div>
+    <p>「AIを育てよう」と思わなくていい。<br>普通に架電するだけで、AIが学ぶ。<br>チームが使えば使うほど、全員が強くなる。</p>
+  </div>
+  <div class="section-desc" style="margin-bottom:0;">
+    トップ営業が辞めても、ノウハウは残る。<br>
+    新人が入っても、即戦力になる。<br>
+    これがTechLeadの設計思想だ。
+  </div>
+</section>
+
+<!-- ロードマップ -->
+<section class="roadmap-section">
+  <div class="section-label">Roadmap</div>
+  <div class="section-title">これから<br>作るもの</div>
+  <div class="section-desc">データが溜まれば、全部が動き出す。</div>
+
+  <div class="roadmap-list">
+
+    <div class="roadmap-item">
+      <div class="roadmap-dot dot-active">📞</div>
+      <div class="roadmap-content">
+        <div class="phase">起点 — まずここから</div>
+        <h3>AI通話録音を動かす</h3>
+        <p>日本の電話番号を取得してデータを溜め始める。全ての機能はここから始まる。通常の架電をするだけで自動で蓄積される。</p>
+      </div>
+    </div>
+
+    <div class="roadmap-item">
+      <div class="roadmap-dot dot-next">⚡</div>
+      <div class="roadmap-content">
+        <div class="phase">Phase 1 — 1〜2ヶ月後</div>
+        <h3>通話中リアルタイムコーチング</h3>
+        <p>相手が話している最中に、画面にベストな返しが表示される。「こう来たらこう返す」をAIがその場で提案。新人でもトップと同じ対話ができる。</p>
+      </div>
+    </div>
+
+    <div class="roadmap-item">
+      <div class="roadmap-dot dot-next">🏆</div>
+      <div class="roadmap-content">
+        <div class="phase">Phase 1 — 1〜2ヶ月後</div>
+        <h3>勝ちパターン自動学習</h3>
+        <p>アポを一番取っている人の返し方・切り出し方をAIが自動抽出。チーム全員の画面に「この返しでアポ率23%」が表示されるようになる。属人化がチームの武器になる瞬間。</p>
+      </div>
+    </div>
+
+    <div class="roadmap-item">
+      <div class="roadmap-dot dot-future">💬</div>
+      <div class="roadmap-content">
+        <div class="phase">Phase 2 — 3〜6ヶ月後</div>
+        <h3>スクリプト自動生成 & A/Bテスト</h3>
+        <p>AIとの対話だけでスクリプト3パターンを自動生成。どの切り出しが刺さるか、データで比較できる。マネージャーの経験則が不要になる。</p>
+      </div>
+    </div>
+
+    <div class="roadmap-item">
+      <div class="roadmap-dot dot-future">📊</div>
+      <div class="roadmap-content">
+        <div class="phase">Phase 3 — 6〜12ヶ月後</div>
+        <h3>個人別コーチングダッシュボード</h3>
+        <p>「この人はクロージングが弱い」「この切り出しは使っていない」をAIが自動分析。マネージャーが感覚ではなくデータで指導できる。</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- 比較 -->
+<section class="compare-section">
+  <div class="section-label">Comparison</div>
+  <div class="section-title">競合との<br>違い</div>
+  <div class="section-desc">海外ツールには日本語がない。日本ツールにはAIがない。</div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th style="text-align:left;">機能</th>
+        <th class="us">TechLead</th>
+        <th>Orum</th>
+        <th>Miitel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>日本語完全対応</td>
+        <td class="highlight-col"><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+      <tr>
+        <td>AI通話録音・自動入力</td>
+        <td class="highlight-col"><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+        <td><span class="partial">△</span></td>
+      </tr>
+      <tr>
+        <td>リアルタイムコーチング</td>
+        <td class="highlight-col"><span class="partial">開発中</span></td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>勝ちパターン自動学習</td>
+        <td class="highlight-col"><span class="partial">開発中</span></td>
+        <td><span class="cross">—</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>リスト戦略AI</td>
+        <td class="highlight-col"><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>Sansan連携</td>
+        <td class="highlight-col"><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>まず使ってみよう。<br>AIは勝手に育つ。</h2>
+  <p>設定は不要。普通に架電するだけで<br>データが溜まり、チームが強くなる。</p>
+  <a class="cta-btn" href="https://techlead-ebon.vercel.app">TechLeadを開く</a>
+  <span class="cta-url">https://techlead-ebon.vercel.app</span>
+</section>
+
+<footer>
+  © 2026 株式会社TechLead. All rights reserved.
+</footer>
+
+</body>
+</html>
